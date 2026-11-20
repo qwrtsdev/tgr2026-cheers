@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", "Trirong", ui-serif, Georgia, serif;
+  --font-sans: "Instrument Sans", "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
+
+  --color-coral: #ff5a5f;
+  --color-cream: #fff5e6;
+  --color-cream-line: #ead7b8;
+  --color-ink: #2a1718;
+  --color-gold: #c99a06;
+  --color-silver: #8e9aa6;
+  --color-bronze: #b0672f;
+  --color-dev: #2563eb; /* DEV badge blue, white text 5.2:1 */
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  /* >= 16px stops iOS zooming into fields */
+  input,
+  textarea,
+  button {
+    font: inherit;
+    font-size: max(1rem, 1em);
+  }
+}
+
+/* Falling coffee beans (index background). Pure CSS transform animations: run on the compositor,
+   no JS per frame, no layout/paint while falling. */
+.bean {
+  position: absolute;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  opacity: 0.5;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cellipse cx='12' cy='12' rx='7.5' ry='10.5' fill='%236f4e37'/%3E%3Cpath d='M12.5 2.5c-3.5 4.5 3 14.5-.5 19' stroke='%23fff5e6' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  will-change: transform;
+  animation: bean-fall var(--dur) linear var(--delay) infinite;
+}
+@keyframes bean-fall {
+  from {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--drift), 110vh, 0) rotate(var(--spin));
+  }
+}
+/* Keep beans falling live during card view transitions (no frozen snapshot, no duplicate fade). */
+#beans {
+  view-transition-name: beans;
+}
+::view-transition-old(beans) {
+  display: none;
+}
+::view-transition-new(beans) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #beans {
+    display: none;
+  }
+}
+
+/* Card swap: old card is tossed left, new one slides in. */
+#card {
+  view-transition-name: card;
+}
+::view-transition-old(card) {
+  animation: card-out 220ms ease-in both;
+}
+::view-transition-new(card) {
+  animation: card-in 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* Cheers overlay fades in (backdrop too, or the instant cream backdrop hides the fade) */
+dialog[open],
+dialog[open]::backdrop {
+  animation: fade-in 450ms ease-out;
+}
+dialog[data-closing],
+dialog[data-closing]::backdrop {
+  animation: fade-out 450ms ease-in forwards;
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --enter: 1 = new card comes from the right, -1 = from the left (set from JS). */
+@keyframes card-out {
+  to {
+    translate: calc(var(--enter, 1) * -35%) 0;
+    rotate: calc(var(--enter, 1) * -7deg);
+    opacity: 0;
+  }
+}
+@keyframes card-in {
+  from {
+    translate: calc(var(--enter, 1) * 30%) 0;
+    rotate: calc(var(--enter, 1) * 5deg);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation: none !important;
+  }
+}

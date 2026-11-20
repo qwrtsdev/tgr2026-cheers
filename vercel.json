@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/tesa/leaderboard",
+      "destination": "https://tesa-score.c333m.site/api/v1/competition/leaderboard"
+    }
+  ]
+}

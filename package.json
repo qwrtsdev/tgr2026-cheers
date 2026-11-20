@@ -9,9 +9,22 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:migration": "supabase migration new",
+    "db:push": "supabase db push",
+    "db:types": "supabase gen types typescript --linked > src/lib/database.types.ts"
   },
   "dependencies": {
-    "astro": "^7.4.13"
+    "@lottiefiles/dotlottie-wc": "^0.12.2",
+    "@supabase/supabase-js": "^2.119.2",
+    "@tailwindcss/vite": "^4.3.5",
+    "astro": "^7.4.13",
+    "simple-icons": "^16.38.0",
+    "tailwindcss": "^4.3.5"
+  },
+  "devDependencies": {
+    "supabase": "^3.2.0"
   }
 }

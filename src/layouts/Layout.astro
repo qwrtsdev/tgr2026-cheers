@@ -1,0 +1,29 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+---
+
+<html lang="th" class="overflow-x-clip">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fff5e6" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500..800;1,9..144,400&family=Instrument+Sans:wght@400;600&family=Trirong:ital,wght@0,700;1,400&family=IBM+Plex+Sans+Thai:wght@400;600&display=swap"
+    />
+    <title>{title} · MakeFriend</title>
+  </head>
+  <body class="min-h-dvh overflow-x-clip bg-cream font-sans text-ink antialiased">
+    <main class="mx-auto grid min-h-dvh w-full max-w-sm grid-cols-[minmax(0,1fr)] content-center gap-6 px-4 py-10">
+      <slot />
+    </main>
+  </body>
+</html>

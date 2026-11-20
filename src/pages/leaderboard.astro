@@ -1,0 +1,66 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="อันดับการ์ด">
+  <div id="loading" role="status" class="fixed inset-0 z-20 grid place-items-center bg-cream">
+    <span class="size-10 animate-spin rounded-full border-4 border-coral border-t-transparent motion-reduce:animate-[spin_2s_linear_infinite]"></span>
+    <span class="sr-only">กำลังโหลดอันดับ…</span>
+  </div>
+
+  <section aria-labelledby="title" class="w-full rounded-md bg-white p-7 shadow-xl shadow-ink/10">
+    <p class="font-display text-[1.2rem] font-bold italic text-coral">ชนแก้วมากที่สุด</p>
+    <h1 id="title" class="mt-1 font-display text-[clamp(2.2rem,10vw,3.05rem)] leading-[1.25] font-bold">อันดับการ์ด</h1>
+
+    <hr class="my-6 border-t-2 border-dashed border-cream-line" />
+
+    <ol id="list" class="flex flex-col"></ol>
+    <p id="empty" hidden class="text-lg">ยังไม่มีใครได้ชนแก้วเลย</p>
+  </section>
+
+  <a href="/" class="min-h-12 grid place-items-center rounded-md bg-ink px-4 font-semibold text-cream transition-transform hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink active:translate-y-0">
+    กลับ
+  </a>
+</Layout>
+
+<script>
+  import { supabase, avatarUrl } from '../lib/supabase';
+
+  type Row = { id: string; display_name: string; avatar_path: string | null; cheers: number };
+  const list = document.getElementById('list')!;
+  const empty = document.getElementById('empty')!;
+
+  const { data, error } = await supabase.rpc('leaderboard', { n: 10 });
+  const rows = (data ?? []) as Row[];
+
+  // textContent only: names are user input
+  list.replaceChildren(...rows.map((r, i) => {
+    const li = document.createElement('li');
+    li.className = 'flex items-center gap-3 border-b border-cream-line py-3 last:border-0';
+    const rank = document.createElement('span');
+    rank.className = `w-8 shrink-0 font-display text-2xl font-bold ${i < 3 ? 'text-coral' : 'text-ink/40'}`;
+    rank.textContent = String(i + 1);
+    // Small photo; a plain circle when there's none, so names stay aligned.
+    const pic = document.createElement(r.avatar_path ? 'img' : 'span');
+    pic.className = 'size-9 shrink-0 rounded-full bg-cream object-cover';
+    if (pic instanceof HTMLImageElement) {
+      pic.src = avatarUrl(r.avatar_path!);
+      pic.alt = '';
+      pic.width = pic.height = 36;
+      pic.loading = 'lazy';
+    }
+    const name = document.createElement('span');
+    name.className = 'min-w-0 flex-1 truncate text-lg font-semibold';
+    name.textContent = r.display_name;
+    const count = document.createElement('span');
+    count.className = 'shrink-0 font-semibold tabular-nums';
+    count.textContent = `${r.cheers} แก้ว`;
+    li.append(rank, pic, name, count);
+    return li;
+  }));
+  if (error) {
+    empty.textContent = `โหลดอันดับไม่สำเร็จ: ${error.message}`;
+    empty.hidden = false;
+  } else empty.hidden = rows.length > 0;
+  document.getElementById('loading')!.hidden = true;
+</script>

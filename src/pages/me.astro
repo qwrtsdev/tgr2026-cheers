@@ -1,0 +1,297 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { CONTACTS } from '../lib/contacts';
+---
+
+<Layout title="การ์ดของฉัน">
+  <header class="flex items-center justify-between gap-4">
+    <a href="/" class="-ml-2 flex min-h-12 items-center gap-1.5 rounded-md px-2 text-sm hover:underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-5 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+      กลับ
+    </a>
+  </header>
+
+  <div class="-mb-2">
+    <h1 id="form-title" class="font-display text-[2.44rem] leading-[1.25] font-bold">การ์ดของคุณ</h1>
+    <p class="mt-1 text-sm/relaxed text-ink/70">หน้าตาเหมือนที่คนอื่นเห็น แก้ตรงไหนก็ได้แล้วกดบันทึก</p>
+  </div>
+
+  <!-- The form is laid out like the card itself, so you edit what people will see. -->
+  <form id="profile" method="post" aria-labelledby="form-title" novalidate
+    class="grid w-full grid-cols-[minmax(0,1fr)] rounded-md bg-white p-7 shadow-xl shadow-ink/10">
+
+    <div class="flex items-start gap-4">
+      <div class="grid min-w-0 flex-1 gap-3">
+        <div class="grid gap-0.5">
+          <label for="display_name" class="text-sm text-ink/70">ชื่อเล่น <span class="text-coral" aria-hidden="true">*</span><span class="sr-only">(จำเป็น)</span></label>
+          <input id="display_name" name="display_name" type="text" required maxlength="60" autocomplete="nickname"
+            enterkeyhint="next" placeholder="ชื่อของคุณ"
+            class="min-h-12 w-full min-w-0 font-display text-[2rem] leading-[1.4] font-bold border-b-2 border-cream-line bg-transparent outline-none transition-colors placeholder:text-ink/40 focus:border-coral user-invalid:border-coral" />
+        </div>
+        <div class="flex items-center gap-0.5 font-semibold">
+          <label for="tgr_team_number">ทีม TGR-</label>
+          <input id="tgr_team_number" name="tgr_team_number" type="text" inputmode="numeric" maxlength="2"
+            pattern="0?[1-9]|[1-4][0-9]|5[0-6]" placeholder="00" aria-describedby="team-help"
+            title="ใส่เลข 1–56 หรือเว้นว่างไว้" enterkeyhint="next"
+            class="min-h-10 w-12 text-center tabular-nums border-b-2 border-cream-line bg-transparent outline-none transition-colors placeholder:text-ink/40 focus:border-coral user-invalid:border-coral" />
+        </div>
+        <p id="team-help" class="-mt-2 text-xs text-ink/60">เลข 1–56 · เว้นว่างถ้าไม่ระบุ</p>
+      </div>
+
+      <div class="grid justify-items-center gap-1 pt-6">
+        <label for="avatar"
+          class="group/av relative grid size-20 cursor-pointer place-items-center rounded-full bg-cream text-ink/50 transition-colors hover:text-coral has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink">
+          <img id="avatar-preview" alt="" hidden class="size-full rounded-full object-cover" />
+          <span id="avatar-placeholder" class="contents">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="size-8 fill-none stroke-current" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" />
+            </svg>
+          </span>
+          <!-- camera badge -->
+          <span class="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full border-2 border-white bg-ink text-cream transition-transform group-hover/av:scale-110">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="size-4 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
+          <span class="sr-only">รูปโปรไฟล์ (ไม่บังคับ)</span>
+          <input id="avatar" type="file" accept="image/*" class="sr-only" />
+        </label>
+        <button id="avatar-remove" type="button" hidden class="min-h-8 rounded px-1 text-xs text-ink/70 underline underline-offset-2 hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">ลบรูป</button>
+      </div>
+    </div>
+
+    <hr class="my-6 border-t-2 border-dashed border-cream-line" />
+
+    <div class="grid gap-1">
+      <div class="flex items-baseline justify-between">
+        <label for="description" class="text-sm text-ink/70">เกี่ยวกับคุณ</label>
+        <span id="desc-count" class="text-xs tabular-nums text-ink/60" aria-hidden="true">0/500</span>
+      </div>
+      <textarea id="description" name="description" rows="5" maxlength="500"
+        placeholder="งานอดิเรก สิ่งที่ชอบ หรือกำลังมองหาเพื่อนแบบไหน"
+        class="field-sizing-content min-h-32 w-full resize-none rounded-md bg-cream/60 p-3 text-lg/relaxed outline-none ring-coral transition-shadow placeholder:text-ink/40 focus:ring-2"></textarea>
+    </div>
+
+    <hr class="my-6 border-t-2 border-dashed border-cream-line" />
+
+    <fieldset class="grid gap-2" aria-describedby="contacts-help">
+      <legend class="text-sm text-ink/70">ช่องทางติดต่อ</legend>
+      <p id="contacts-help" class="text-xs text-ink/60">ไม่บังคับ · ทุกคนจะเห็นช่องทางที่คุณใส่</p>
+      {CONTACTS.map((c) => (
+        <div class="flex items-center gap-3">
+          <label for={c.key} class="shrink-0" title={c.label}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-current"><path d={c.icon} /></svg>
+            <span class="sr-only">{c.label}</span>
+          </label>
+          <input id={c.key} name={c.key} type={c.url ? 'url' : 'text'} inputmode={c.url ? 'url' : undefined}
+            pattern={c.pattern} maxlength={c.url ? 200 : 32} placeholder={c.placeholder}
+            title={c.url ? `ลิงก์ ${c.label} ที่ขึ้นต้นด้วย https://` : 'ตัวพิมพ์เล็ก ตัวเลข _ หรือ . ยาว 2–32 ตัว'}
+            autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next"
+            class="min-h-12 min-w-0 flex-1 border-b-2 border-cream-line bg-transparent outline-none transition-colors placeholder:text-ink/40 focus:border-coral user-invalid:border-coral" />
+        </div>
+      ))}
+    </fieldset>
+
+    <p id="status" role="status" class="mt-6 text-sm font-semibold empty:hidden"></p>
+
+    <button id="save" type="submit" disabled
+      class="mt-6 min-h-12 w-full rounded-md bg-ink px-7 font-semibold text-cream transition-[background-color,translate] duration-300 hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink active:translate-y-0 disabled:opacity-70 data-saved:bg-green-700 data-saved:opacity-100">
+      บันทึก
+    </button>
+    <span id="saved-sr" role="status" class="sr-only"></span>
+  </form>
+
+  <p class="-mt-2 text-xs/relaxed text-ink/60">
+    ไม่ต้องสมัครสมาชิก การ์ดผูกกับเบราว์เซอร์นี้ ถ้าล้างข้อมูลเว็บไซต์จะกลับมาแก้การ์ดนี้ไม่ได้อีก
+  </p>
+  <button id="delete" type="button" hidden
+    class="-mt-4 justify-self-start rounded px-1 py-2 text-sm text-ink/70 underline underline-offset-4 hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">
+    ลบการ์ดของฉัน
+  </button>
+</Layout>
+
+<script>
+  import { supabase, avatarUrl } from '../lib/supabase';
+  import { ensureSession } from '../lib/session';
+  import { CONTACTS, CONTACT_COLUMNS } from '../lib/contacts';
+
+  const form = document.getElementById('profile') as HTMLFormElement;
+  const save = document.getElementById('save') as HTMLButtonElement;
+  const del = document.getElementById('delete') as HTMLButtonElement;
+  const status = document.getElementById('status')!;
+  const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;
+  let userId = '';
+
+  // Team number: digits only; anything outside 1–56 is cleared (= not specified).
+  const teamInput = document.getElementById('tgr_team_number') as HTMLInputElement;
+  const inRange = (v: string) => Number(v) >= 1 && Number(v) <= 56;
+  teamInput.addEventListener('input', () => {
+    teamInput.value = teamInput.value.replace(/\D/g, '');
+    if (teamInput.value.length === 2 && !inRange(teamInput.value)) teamInput.value = ''; // "0" alone may still become "04"
+  });
+  teamInput.addEventListener('blur', () => {
+    if (!inRange(teamInput.value)) teamInput.value = '';
+  });
+
+  const desc = document.getElementById('description') as HTMLTextAreaElement;
+  const updateCount = () => (document.getElementById('desc-count')!.textContent = `${desc.value.length}/500`);
+  desc.addEventListener('input', updateCount);
+
+  // ---- profile photo ----
+  const avatarInput = document.getElementById('avatar') as HTMLInputElement;
+  const preview = document.getElementById('avatar-preview') as HTMLImageElement;
+  const placeholder = document.getElementById('avatar-placeholder')!;
+  const removeBtn = document.getElementById('avatar-remove') as HTMLButtonElement;
+  let savedAvatar: string | null = null; // path currently stored on the card
+  let pendingAvatar: Blob | null = null; // picked but not saved yet
+  let removeAvatar = false;
+
+  function showAvatar(src: string | null) {
+    preview.hidden = !src;
+    if (src) preview.src = src;
+    placeholder.hidden = !!src;
+    removeBtn.hidden = !src;
+  }
+
+  // Center-crop to a 512x512 square and re-encode: small upload, strips EXIF (incl. GPS location).
+  async function toSquareImage(file: File): Promise<Blob> {
+    const bmp = await createImageBitmap(file);
+    const side = Math.min(bmp.width, bmp.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 512;
+    canvas.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 512, 512);
+    const encode = (type: string) => new Promise<Blob | null>((r) => canvas.toBlob(r, type, 0.85));
+    const webp = await encode('image/webp');
+    return webp?.type === 'image/webp' ? webp : (await encode('image/jpeg'))!; // older Safari can't encode webp
+  }
+
+  avatarInput.addEventListener('change', async () => {
+    const file = avatarInput.files?.[0];
+    avatarInput.value = ''; // allow picking the same file again
+    if (!file) return;
+    try {
+      pendingAvatar = await toSquareImage(file);
+      removeAvatar = false;
+      showAvatar(URL.createObjectURL(pendingAvatar));
+      status.textContent = 'กด "บันทึก" เพื่อใช้รูปนี้';
+    } catch {
+      status.textContent = 'เปิดรูปนี้ไม่ได้ ลองเลือกรูปอื่น';
+    }
+  });
+  removeBtn.addEventListener('click', () => {
+    pendingAvatar = null;
+    removeAvatar = true;
+    showAvatar(null);
+  });
+
+  async function init() {
+    let session;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) status.textContent = 'กำลังตรวจสอบว่าไม่ใช่บอท…';
+      session = await ensureSession();
+      status.textContent = '';
+    } catch {
+      status.textContent = 'ยืนยันตัวตนไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง';
+      return;
+    }
+    userId = session.user.id;
+
+    const { data, error } = await supabase
+      .from('profiles').select(`display_name, description, tgr_team_number, avatar_path, ${CONTACT_COLUMNS}`).eq('id', userId).maybeSingle();
+    if (error) status.textContent = `โหลดการ์ดของคุณไม่สำเร็จ: ${error.message}`;
+    if (data) {
+      field('display_name').value = data.display_name;
+      (form.elements.namedItem('tgr_team_number') as HTMLInputElement).value = data.tgr_team_number ? String(data.tgr_team_number).padStart(2, '0') : ''; // TGR-04 style
+      for (const c of CONTACTS) field(c.key).value = data[c.key] ?? '';
+      field('description').value = data.description;
+      updateCount();
+      savedAvatar = data.avatar_path;
+      showAvatar(savedAvatar && avatarUrl(savedAvatar));
+      del.hidden = false;
+    }
+    save.disabled = false;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // Forgive missing/insecure scheme: "instagram.com/x" or "http://..." becomes https://
+    for (const c of CONTACTS) {
+      const el = field(c.key);
+      el.value = el.value.trim();
+      if (c.url && el.value) el.value = 'https://' + el.value.replace(/^https?:\/\//i, '');
+      if (!c.url) el.value = el.value.toLowerCase();
+    }
+    field('tgr_team_number').value = field('tgr_team_number').value.trim();
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      form.querySelector<HTMLElement>(':invalid')?.focus();
+      return;
+    }
+    save.disabled = true;
+    status.textContent = '';
+    save.textContent = 'กำลังบันทึก…';
+
+    let avatar_path = removeAvatar ? null : savedAvatar;
+    if (pendingAvatar) {
+      const path = `${userId}/${Date.now()}.${pendingAvatar.type === 'image/webp' ? 'webp' : 'jpg'}`;
+      const { error } = await supabase.storage.from('avatars')
+        .upload(path, pendingAvatar, { contentType: pendingAvatar.type, cacheControl: '31536000' });
+      if (error) {
+        save.disabled = false;
+        status.textContent = `อัปโหลดรูปไม่สำเร็จ: ${error.message}`;
+        save.textContent = 'บันทึก';
+        return;
+      }
+      avatar_path = path; // new name every upload, so the year-long cache never shows a stale photo
+    }
+
+    const { error } = await supabase.from('profiles').upsert({
+      avatar_path,
+      id: userId,
+      display_name: field('display_name').value.trim(),
+      tgr_team_number: Number((form.elements.namedItem('tgr_team_number') as HTMLInputElement).value) || null,
+      ...Object.fromEntries(CONTACTS.map((c) => [c.key, field(c.key).value || null])),
+      description: field('description').value.trim(),
+    });
+    save.disabled = false;
+    if (error) {
+      status.textContent = `บันทึกไม่สำเร็จ: ${error.message}`;
+      save.textContent = 'บันทึก';
+      return;
+    }
+    // Success: no message, the button flashes green for a moment instead.
+    save.textContent = 'บันทึกแล้ว ✓';
+    save.toggleAttribute('data-saved', true);
+    document.getElementById('saved-sr')!.textContent = 'บันทึกแล้ว';
+    setTimeout(() => {
+      save.toggleAttribute('data-saved', false);
+      save.textContent = 'บันทึก';
+      document.getElementById('saved-sr')!.textContent = '';
+    }, 1600);
+    del.hidden = false;
+    const old = savedAvatar;
+    savedAvatar = avatar_path;
+    pendingAvatar = null;
+    removeAvatar = false;
+    if (old && old !== avatar_path) supabase.storage.from('avatars').remove([old]); // best effort cleanup
+  });
+
+  del.addEventListener('click', async () => {
+    if (!confirm('ลบการ์ดของคุณใช่ไหม? ลบแล้วกู้คืนไม่ได้')) return;
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (error) {
+      status.textContent = `ลบไม่สำเร็จ: ${error.message}`;
+      return;
+    }
+    if (savedAvatar) supabase.storage.from('avatars').remove([savedAvatar]);
+    savedAvatar = pendingAvatar = null;
+    showAvatar(null);
+    form.reset();
+    updateCount();
+    del.hidden = true;
+    status.textContent = 'ลบการ์ดแล้ว';
+  });
+
+  init();
+</script>

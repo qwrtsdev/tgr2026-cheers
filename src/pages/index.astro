@@ -1,16 +1,644 @@
 ---
+import Layout from '../layouts/Layout.astro';
+
+// Falling coffee beans: positions/timings fixed at build time (seeded), so no JS runs for them.
+let seed = 7;
+const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+const beans = Array.from({ length: 14 }, () => {
+  const dur = 9 + rand() * 8; // seconds per fall
+  return {
+    left: `${(rand() * 100).toFixed(1)}%`,
+    size: `${Math.round(18 + rand() * 16)}px`,
+    dur: `${dur.toFixed(1)}s`,
+    delay: `-${(rand() * dur).toFixed(1)}s`, // negative: already mid-fall on load
+    drift: `${Math.round(rand() * 80 - 40)}px`,
+    spin: `${Math.round((180 + rand() * 360) * (rand() < 0.5 ? -1 : 1))}deg`,
+  };
+});
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout title="พบเพื่อนใหม่">
+  <div id="beans" aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    {beans.map((b) => (
+      <span class="bean" style={`left:${b.left};--size:${b.size};--dur:${b.dur};--delay:${b.delay};--drift:${b.drift};--spin:${b.spin}`} />
+    ))}
+  </div>
+
+  <h1 class="sr-only">พบเพื่อนใหม่</h1>
+
+  <div id="loading" role="status" class="fixed inset-0 z-20 grid place-items-center bg-cream">
+    <span class="size-10 animate-spin rounded-full border-4 border-coral border-t-transparent motion-reduce:animate-[spin_2s_linear_infinite]"></span>
+    <span class="sr-only">กำลังโหลดการ์ด…</span>
+  </div>
+
+  <!-- How many people cheered you; tap to see who. -->
+  <button id="stats" type="button" aria-label="มี 0 คนชนแก้วกับคุณ"
+    class="-mb-3 flex min-h-12 items-center gap-2 justify-self-start text-lg font-semibold tabular-nums underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-ink">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 shrink-0 fill-none stroke-coral" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <g transform="rotate(14 7.5 12)"><path d="M5 2h5l-.6 6.5a2 2 0 0 1-3.8 0Z M7.5 10.5V18 M5.5 18h4" /></g>
+        <g transform="rotate(-14 16.5 12)"><path d="M14 2h5l-.6 6.5a2 2 0 0 1-3.8 0Z M16.5 10.5V18 M14.5 18h4" /></g>
+      </svg>
+    <span id="stats-text">0</span>
+  </button>
+
+  <article id="card" aria-live="polite" class="relative flex h-[28rem] w-full flex-col touch-pan-y select-none rounded-md bg-white p-7 shadow-xl shadow-ink/10">
+    <header class="flex shrink-0 items-center gap-4">
+      <div class="min-w-0 flex-1">
+        <!-- One line; long names end in "…" but the DEV badge always stays visible. -->
+        <h2 id="name" class="flex items-center gap-2 font-display text-[clamp(2.2rem,10vw,3.05rem)] leading-[1.4] font-bold">
+          <span id="name-text" class="min-w-0 truncate">…</span>
+          <span id="dev" hidden class="shrink-0 rounded bg-dev px-1.5 py-0.5 font-sans text-xs leading-none font-bold tracking-wide text-white">DEV</span>
+        </h2>
+        <p id="team" hidden class="mt-1 flex flex-wrap items-center font-semibold"></p>
+      </div>
+      <img id="avatar" hidden alt="" width="80" height="80" class="size-20 shrink-0 rounded-full bg-cream object-cover" />
+    </header>
+
+    <hr class="my-6 shrink-0 border-t-2 border-dashed border-cream-line" />
+
+    <div class="flex min-h-0 flex-1 flex-col gap-4">
+      <div class="flex min-h-0 flex-1 flex-col items-start">
+        <!-- Long text is cut off with a fade; "อ่านเพิ่มเติม" opens the full text. -->
+        <p id="description" class="min-h-0 w-full flex-1 overflow-hidden text-lg/relaxed whitespace-pre-line break-words data-overflow:mask-b-from-60%"></p>
+        <button id="more" type="button" hidden
+          class="min-h-10 text-sm font-semibold underline decoration-2 underline-offset-4 hover:decoration-4 focus-visible:outline-3 focus-visible:outline-ink">
+          อ่านเพิ่มเติม
+        </button>
+      </div>
+      <ul id="contacts" aria-label="ช่องทางติดต่อ" class="-ml-3 flex min-h-12 shrink-0 flex-wrap items-center gap-1 pr-20"></ul>
+    </div>
+
+    <!-- Thumb-sized quarter-circle tab covering the card's bottom-right corner. -->
+    <button id="cheers-btn" type="button" disabled aria-label="ชนแก้ว"
+      class="group/cheers absolute right-0 bottom-0 grid size-24 origin-bottom-right scale-125 place-items-end rounded-tl-[100%] rounded-br-md bg-coral pr-4 pb-4 text-white transition-[filter] data-done:bg-cream-line data-done:text-ink/50 hover:brightness-95 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink active:brightness-90 disabled:opacity-40">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-11 fill-none stroke-current transition-transform group-hover/cheers:-rotate-12 group-active/cheers:scale-90" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
+        <g transform="rotate(14 7.5 12)"><path d="M5 2h5l-.6 6.5a2 2 0 0 1-3.8 0Z M7.5 10.5V18 M5.5 18h4" /></g>
+        <g transform="rotate(-14 16.5 12)"><path d="M14 2h5l-.6 6.5a2 2 0 0 1-3.8 0Z M16.5 10.5V18 M14.5 18h4" /></g>
+      </svg>
+    </button>
+  </article>
+
+  <div class="flex items-center justify-between gap-3">
+    <a href="/me" class="flex min-h-12 items-center gap-2 whitespace-nowrap text-sm text-ink underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+      การ์ดของคุณ
+    </a>
+    <!-- Hidden: swipe / drag / ← → / A D replace it. Kept for screen readers, whose arrow keys move the reading cursor. -->
+    <button id="again" type="button"
+      class="sr-only">
+      สุ่มใหม่
+    </button>
+    <a href="/leaderboard" class="flex min-h-12 items-center gap-2 whitespace-nowrap text-sm text-ink underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-7h6v7M9 21V9h6v12M15 21v-5h6v5M2 21h20" /></svg>
+      อันดับการ์ด
+    </a>
+  </div>
+
+  <dialog id="cheers" aria-labelledby="cheers-title"
+    class="m-0 size-full max-h-none max-w-none bg-cream p-0 text-ink backdrop:bg-cream">
+    <div class="grid h-full place-content-center justify-items-center gap-1 p-6 text-center">
+      <div id="cheers-anim" class="-mb-12 size-[min(100vw,480px)]"></div>
+      <p id="cheers-title" class="font-display text-[clamp(2.6rem,13vw,4rem)] leading-tight font-bold text-coral">ชนแก้ว!</p>
+      <p class="text-lg">คุณชนแก้วกับ <strong id="cheers-name" class="font-semibold"></strong></p>
+    </div>
+  </dialog>
+
+  <dialog id="cheerers-dialog" aria-labelledby="cheerers-title" class="m-auto max-h-[85dvh] w-[min(calc(100vw-2rem),28rem)] overflow-y-auto overscroll-contain rounded-md bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40">
+    <div class="sticky top-0 flex items-start gap-3 bg-white px-7 pt-6 pb-3">
+      <h2 id="cheerers-title" class="min-w-0 flex-1 font-display text-3xl leading-[1.25] font-bold">คนที่ชนแก้วกับคุณ</h2>
+      <button type="button" data-close aria-label="ปิด"
+        class="-mr-3 -mt-1 grid size-12 shrink-0 place-items-center rounded-md hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <ul id="cheerers-list" class="flex flex-col px-7"></ul>
+    <p id="cheerers-note" class="px-7 pt-2 pb-7 text-sm empty:hidden"></p>
+  </dialog>
+
+  <!-- First cheer without a card: ask for a nickname so the person you cheer sees who it was. -->
+  <dialog id="name-dialog" aria-labelledby="name-title" class="m-auto max-h-[85dvh] w-[min(calc(100vw-2rem),28rem)] overflow-y-auto overscroll-contain rounded-md bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40">
+    <form id="name-form" novalidate class="grid gap-4 p-7">
+      <div class="flex items-start gap-3">
+        <h2 id="name-title" class="min-w-0 flex-1 font-display text-3xl leading-[1.25] font-bold">บอกชื่อเล่นหน่อย</h2>
+        <button type="button" data-close aria-label="ปิด"
+          class="-mr-3 -mt-1 grid size-12 shrink-0 place-items-center rounded-md hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <p id="nick-help" class="-mt-2 text-sm/relaxed">คนที่คุณชนแก้วด้วยจะเห็นชื่อนี้ เพิ่มรายละเอียดอื่นทีหลังได้ที่ "การ์ดของคุณ"</p>
+      <div class="grid gap-1.5">
+        <label for="nick" class="font-display text-[1.2rem] font-bold italic text-coral">ชื่อเล่น</label>
+        <input id="nick" name="nick" type="text" required maxlength="60" autocomplete="nickname" enterkeyhint="done"
+          aria-describedby="nick-help nick-error"
+          class="min-h-12 w-full min-w-0 border-b-2 border-ink bg-transparent px-1 font-display text-2xl font-bold focus-visible:border-coral focus-visible:outline-none" />
+        <p id="nick-error" role="status" class="text-sm font-semibold empty:hidden"></p>
+      </div>
+      <button id="nick-save" type="submit"
+        class="min-h-12 rounded-md bg-ink px-6 font-semibold text-cream transition-transform hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink active:translate-y-0 disabled:opacity-70">
+        บันทึกแล้วชนแก้ว
+      </button>
+    </form>
+  </dialog>
+
+  <dialog id="desc-dialog" aria-labelledby="desc-title"
+    class="m-auto max-h-[85dvh] w-[min(calc(100vw-2rem),28rem)] overflow-y-auto overscroll-contain rounded-md bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40">
+    <div class="sticky top-0 flex items-start gap-3 bg-white px-7 pt-6 pb-3">
+      <h2 id="desc-title" class="min-w-0 flex-1 font-display text-3xl leading-[1.25] font-bold break-words"></h2>
+      <button type="button" data-close aria-label="ปิด"
+        class="-mr-3 -mt-1 grid size-12 shrink-0 place-items-center rounded-md hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <p id="desc-full" class="px-7 pb-7 text-lg/relaxed whitespace-pre-line break-words"></p>
+  </dialog>
+
+  <div id="toast" role="status"
+    class="pointer-events-none fixed inset-x-0 bottom-8 z-30 mx-auto w-fit rounded-md bg-ink px-5 py-3 font-semibold text-cream opacity-0 transition-opacity duration-300 data-show:opacity-100"></div>
+</Layout>
+
+<script>
+  import { supabase, avatarUrl } from '../lib/supabase';
+  import { CONTACTS, type Contacts } from '../lib/contacts';
+  import { ensureSession } from '../lib/session';
+  import { loadPlacements, TRACK_LABEL, type Placement } from '../lib/placements';
+  import wasmUrl from '@lottiefiles/dotlottie-web/dotlottie-player.wasm?url';
+
+  type Profile = Contacts & { id: string; display_name: string; description: string; tgr_team_number: number | null; avatar_path: string | null; is_dev: boolean };
+  type LottieEl = HTMLElement & { dotLottie: { addEventListener(e: string, f: () => void): void } | null };
+
+  const $ = (id: string) => document.getElementById(id)!;
+  const again = $('again') as HTMLButtonElement;
+  const cheersBtn = $('cheers-btn') as HTMLButtonElement;
+  const dialog = $('cheers') as HTMLDialogElement;
+  const card = $('card');
+  const loading = $('loading');
+  let current: Profile | null = null;
+  let myId: string | null = null;
+  const cheered = new Set<string>(); // card ids this user already cheered (one cheer per card)
+
+  function updateCheersBtn() {
+    const mine = !!current && current.id === myId;
+    const done = !!current && cheered.has(current.id);
+    cheersBtn.disabled = !current || mine;
+    cheersBtn.toggleAttribute('data-done', done || mine);
+    cheersBtn.setAttribute('aria-label',
+      !current ? 'ชนแก้ว'
+      : mine ? 'การ์ดของคุณเอง'
+      : done ? `ชนแก้วกับ ${current.display_name} ไปแล้ว`
+      : `ชนแก้วกับ ${current.display_name}`);
+  }
+
+  // Every visitor gets an (anonymous, hCaptcha-checked) account right away, so stats and cheers just work.
+  // Runs alongside the first card load; returning visitors reuse the stored session instantly.
+  ensureSession().then(async (session) => {
+    myId = session.user.id;
+    // ponytail: loads all of this user's cheers; fine for hundreds of cards.
+    const { data } = await supabase.from('cheers').select('to_profile').eq('from_user', myId);
+    for (const r of data ?? []) cheered.add(r.to_profile);
+    updateCheersBtn();
+    refreshStats();
+  }).catch(() => {}); // captcha/network failed: cheering retries sign-in later
+
+
+  function icon(path: string) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('class', 'size-6 fill-current');
+    const p = document.createElementNS(ns, 'path');
+    p.setAttribute('d', path);
+    svg.append(p);
+    return svg;
+  }
+
+  let toastTimer: ReturnType<typeof setTimeout>;
+  function toast(text: string) {
+    const el = $('toast');
+    el.textContent = text;
+    el.toggleAttribute('data-show', true);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toggleAttribute('data-show', false), 2000);
+  }
+
+  function contactItem(c: (typeof CONTACTS)[number], value: string) {
+    const li = document.createElement('li');
+    if (c.url) {
+      const a = document.createElement('a');
+      a.href = value;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.title = c.label;
+      a.setAttribute('aria-label', c.label);
+      a.className = 'grid size-12 place-items-center rounded-md transition-colors hover:text-coral focus-visible:outline-3 focus-visible:outline-ink';
+      a.append(icon(c.icon));
+      li.append(a);
+      return li;
+    }
+    // Discord has no profile URL: icon only, tap copies the username.
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.title = `คัดลอก username ${c.label}`;
+    btn.setAttribute('aria-label', `คัดลอก username ${c.label}: ${value}`);
+    btn.className = 'grid size-12 place-items-center rounded-md transition-colors hover:text-coral focus-visible:outline-3 focus-visible:outline-ink';
+    btn.append(icon(c.icon));
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(value);
+        toast('คัดลอก username แล้ว');
+      } catch {
+        toast('คัดลอกไม่สำเร็จ');
+      }
+    });
+    li.append(btn);
+    return li;
+  }
+
+  // textContent / attributes only: profile text is user input, never inject as HTML
+  // Podium cups next to the team number (1st gold, 2nd silver, 3rd bronze), one per track placed in.
+  const CUP = 'M6 3h12v2h3v3a4 4 0 0 1-4 4h-.35A6 6 0 0 1 13 15.9V19h3v2H8v-2h3v-3.1A6 6 0 0 1 7.35 12H7a4 4 0 0 1-4-4V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.73V7Zm12 0v2.73A2 2 0 0 0 19 8V7h-1Z';
+  const CUP_COLOR = { 1: 'text-gold', 2: 'text-silver', 3: 'text-bronze' } as const;
+  let placements = new Map<number, Placement[]>();
+  loadPlacements().then((m) => {
+    placements = m;
+    if (current?.tgr_team_number) addCups(current.tgr_team_number); // card already showing
+  });
+
+  // Each cup is a button; tap (or hover/focus on desktop) shows its category.
+  function addCups(teamNo: number) {
+    const team = $('team');
+    team.querySelectorAll('[data-cup]').forEach((c) => c.remove());
+    for (const { track, rank } of placements.get(teamNo) ?? []) {
+      const label = `อันดับ ${rank} · ${TRACK_LABEL[track]}`;
+      const wrap = document.createElement('span');
+      wrap.className = 'group/cup relative inline-flex first-of-type:ml-1.5'; // cups sit snug together, a little gap after the text
+      wrap.dataset.cup = '';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('aria-expanded', 'false');
+      btn.className = '-mx-1.5 -my-1 grid size-8 place-items-center rounded-full hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink';
+      const svg = icon(CUP);
+      svg.setAttribute('class', `size-5 fill-current ${CUP_COLOR[rank]}`);
+      const tip = document.createElement('span');
+      tip.setAttribute('role', 'tooltip');
+      tip.textContent = label;
+      tip.className = 'pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-xs font-semibold text-cream group-data-open/cup:block pointer-fine:group-hover/cup:block';
+      btn.addEventListener('click', () => {
+        const open = !wrap.hasAttribute('data-open');
+        closeTips();
+        wrap.toggleAttribute('data-open', open);
+        btn.setAttribute('aria-expanded', String(open));
+      });
+      btn.append(svg);
+      wrap.append(btn, tip);
+      team.append(wrap);
+    }
+  }
+  function closeTips() {
+    document.querySelectorAll('[data-cup][data-open]').forEach((w) => {
+      w.removeAttribute('data-open');
+      w.querySelector('button')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!(e.target as Element).closest('[data-cup]')) closeTips(); // tap elsewhere closes the tooltip
+  });
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && closeTips());
+
+  function render(name: string, description: string, p: Profile | null = null) {
+    $('name-text').textContent = name;
+    $('dev').hidden = !p?.is_dev;
+    $('description').textContent = description;
+    $('desc-title').textContent = name;
+    $('desc-full').textContent = description;
+    const avatar = $('avatar') as HTMLImageElement;
+    avatar.hidden = !p?.avatar_path; // no photo: nothing shown, name takes the full width
+    if (p?.avatar_path) {
+      avatar.src = avatarUrl(p.avatar_path);
+      avatar.alt = `รูปของ ${p.display_name}`;
+    }
+    const team = $('team');
+    team.hidden = !p?.tgr_team_number;
+    team.textContent = p?.tgr_team_number ? `ทีม Top Gun #${p.tgr_team_number}` : '';
+    if (p?.tgr_team_number) addCups(p.tgr_team_number);
+    // Only show channels whose value is valid (DB enforces this too; re-check before using as href).
+    const items = CONTACTS.flatMap((c) => {
+      const v = p?.[c.key];
+      return v && new RegExp(`^(?:${c.pattern})$`).test(v) ? [contactItem(c, v)] : [];
+    });
+    if (!items.length) {
+      const li = document.createElement('li');
+      li.className = 'pl-3';
+      li.textContent = '—';
+      items.push(li);
+    }
+    $('contacts').replaceChildren(...items);
+
+    // Card height is fixed: offer the full text only when the description doesn't fit.
+    const desc = $('description');
+    const overflowing = desc.scrollHeight > desc.clientHeight + 1;
+    desc.toggleAttribute('data-overflow', overflowing);
+    $('more').hidden = !overflowing;
+  }
+
+  const descDialog = $('desc-dialog') as HTMLDialogElement;
+  $('more').addEventListener('click', () => descDialog.showModal());
+  // Popups: the X button or a tap on the dimmed backdrop closes them.
+  for (const d of document.querySelectorAll<HTMLDialogElement>('#desc-dialog, #cheerers-dialog, #name-dialog')) {
+    d.addEventListener('click', (e) => {
+      if (e.target === d || (e.target as Element).closest('[data-close]')) d.close();
+    });
+  }
+
+  // ---- nickname before the first cheer ----
+  let profileCheck: Promise<boolean> | null = null;
+  function hasProfile() {
+    profileCheck ??= Promise.resolve(supabase.from('profiles').select('id').eq('id', myId!).maybeSingle())
+      .then(({ data, error }) => (error ? (profileCheck = null, true) : !!data)); // on error don't block the cheer
+    return profileCheck;
+  }
+
+  const nameDialog = $('name-dialog') as HTMLDialogElement;
+  const nameForm = $('name-form') as HTMLFormElement;
+  const nick = $('nick') as HTMLInputElement;
+  const nickError = $('nick-error');
+  const nickSave = $('nick-save') as HTMLButtonElement;
+
+  // Resolves true once a card with that nickname is saved, false if the popup is closed.
+  function askNickname(): Promise<boolean> {
+    return new Promise((resolve) => {
+      nick.value = '';
+      nickError.textContent = '';
+      nameDialog.showModal();
+      const onSubmit = async (e: SubmitEvent) => {
+        e.preventDefault();
+        const name = nick.value.trim();
+        if (!name) {
+          nickError.textContent = 'กรอกชื่อเล่นก่อนนะ';
+          nick.setAttribute('aria-invalid', 'true');
+          return nick.focus();
+        }
+        nick.removeAttribute('aria-invalid');
+        nickSave.disabled = true;
+        const { error } = await supabase.from('profiles').insert({ id: myId, display_name: name });
+        nickSave.disabled = false;
+        if (error && error.code !== '23505') { // 23505: card already exists, fine
+          nickError.textContent = `บันทึกไม่สำเร็จ: ${error.message}`;
+          return;
+        }
+        profileCheck = Promise.resolve(true);
+        done(true);
+      };
+      const onClose = () => done(false);
+      function done(ok: boolean) {
+        nameForm.removeEventListener('submit', onSubmit);
+        nameDialog.removeEventListener('close', onClose);
+        if (nameDialog.open) nameDialog.close();
+        resolve(ok);
+      }
+      nameForm.addEventListener('submit', onSubmit);
+      nameDialog.addEventListener('close', onClose);
+    });
+  }
+
+  // ---- "who cheered me" ----
+  const statsBtn = $('stats') as HTMLButtonElement;
+  const cheerersDialog = $('cheerers-dialog') as HTMLDialogElement;
+
+  // Newest first. Cheerers without a card have no name to show; they only count.
+  async function loadReceived() {
+    const { data: rows } = await supabase.from('cheers').select('from_user')
+      .eq('to_profile', myId!).order('created_at', { ascending: false });
+    const ids = (rows ?? []).map((r) => r.from_user as string);
+    const { data: profs } = ids.length ? await supabase.from('profiles').select('*').in('id', ids) : { data: [] };
+    const byId = new Map(((profs ?? []) as Profile[]).map((p) => [p.id, p]));
+    return { total: ids.length, people: ids.flatMap((id) => byId.get(id) ?? []) };
+  }
+
+  async function refreshStats() {
+    if (!myId) return;
+    const { total, people } = await loadReceived();
+    $('stats-text').textContent = String(total);
+    statsBtn.setAttribute('aria-label', `มี ${total} คนชนแก้วกับคุณ`);
+    return { total, people };
+  }
+
+  statsBtn.addEventListener('click', async () => {
+    const { total, people } = (await refreshStats()) ?? { total: 0, people: [] as Profile[] };
+    $('cheerers-list').replaceChildren(...people.map((p) => {
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-3 border-b border-cream-line py-2 last:border-0';
+      const name = document.createElement('span');
+      name.className = 'min-w-0 flex-1 truncate text-lg font-semibold';
+      name.textContent = p.display_name; // user input: text only
+      // "Visit": show their card in the middle; swipe away and you're back to random cards.
+      // From there the card's own cheers button cheers back.
+      const visit = document.createElement('button');
+      visit.type = 'button';
+      visit.textContent = 'ไปเยี่ยม';
+      visit.setAttribute('aria-label', `ไปเยี่ยมการ์ดของ ${p.display_name}`);
+      visit.className = 'min-h-10 shrink-0 rounded-md bg-ink px-4 text-sm font-semibold text-cream hover:-translate-y-0.5 transition-transform focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink';
+      visit.addEventListener('click', () => {
+        cheerersDialog.close();
+        document.documentElement.style.setProperty('--enter', '1');
+        show(p);
+      });
+      li.append(name, visit);
+      return li;
+    }));
+    const others = total - people.length;
+    $('cheerers-note').textContent =
+      !total ? 'ยังไม่มีใครชนแก้วกับคุณ ลองชนแก้วกับคนอื่นก่อนสิ'
+      : others ? `และอีก ${others} คนที่ยังไม่ได้สร้างการ์ด` : '';
+    cheerersDialog.showModal();
+  });
+
+  const AHEAD = 3; // cards prefetched behind the visible one
+  const queue: Profile[] = [];
+  let fetching: Promise<void> | null = null;
+  let fetchError: string | null = null;
+  let waiting = false;
+
+  function refill(extra = 0) {
+    fetching ??= (async () => {
+      const n = AHEAD + extra - queue.length;
+      if (n <= 0) return;
+      const exclude = [current, ...queue].flatMap((q) => (q ? [q.id] : []));
+      let { data, error } = await supabase.rpc('random_profiles', { exclude, n });
+      // Fewer cards in the DB than we want queued: allow repeats so swiping never dead-ends.
+      if (!error && !data?.length) ({ data, error } = await supabase.rpc('random_profiles', { exclude: [], n }));
+      fetchError = error?.message ?? null;
+      const fresh = (data ?? []) as Profile[];
+      queue.push(...fresh);
+      for (const q of fresh) if (q.avatar_path) new Image().src = avatarUrl(q.avatar_path); // preload photos too
+    })().finally(() => (fetching = null));
+    return fetching;
+  }
+
+  // dir: swipe direction (-1 left, 1 right), 0 = button. The new card enters from the opposite side.
+  async function next(dir = 0) {
+    document.documentElement.style.setProperty('--enter', String(dir ? -dir : 1));
+    if (waiting) return; // already waiting on the network; extra swipes are dropped
+    if (!queue.length) {
+      waiting = true;
+      loading.hidden = false;
+      card.style.viewTransitionName = 'none'; // card is under the overlay: only animate the new one in
+      await refill(1);
+      waiting = false;
+    } else if (dir) {
+      card.style.viewTransitionName = 'none'; // flung card is already off-screen
+    }
+
+    const p = queue.shift() ?? null;
+    show(p, p ? null : fetchError);
+    refill(); // top the queue back up in the background
+  }
+
+  // Put a profile in the middle (random draw, or one picked from the "who cheered me" list).
+  function show(p: Profile | null, error: string | null = null) {
+    const update = () => {
+      loading.hidden = true;
+      card.style.viewTransitionName = '';
+      card.style.transition = 'none';
+      card.style.translate = card.style.rotate = card.style.opacity = ''; // undo the swipe fling
+      current = p;
+      updateCheersBtn();
+      if (error) return render('อุ๊ย', `โหลดการ์ดไม่สำเร็จ: ${error}`);
+      if (!p) return render('ยังไม่มีใครเลย', 'มาเป็นคนแรกกันเถอะ สร้างการ์ดของคุณเลย');
+      render(p.display_name, p.description || '—', p);
+    };
+    // Animated swap where supported; plain swap elsewhere.
+    if (document.startViewTransition) document.startViewTransition(update);
+    else update();
+  }
+
+  async function cheers(target: Profile | null = current) {
+    if (!target) return;
+    if (cheered.has(target.id)) return toast('คุณชนแก้วกับคนนี้ไปแล้ว');
+
+    cheersBtn.disabled = true;
+    try {
+      const firstTime = !myId;
+      myId = (await ensureSession()).user.id;
+      if (firstTime) refreshStats(); // new account: show the stats button
+    } catch {
+      updateCheersBtn();
+      return toast('ยืนยันตัวตนไม่สำเร็จ ลองใหม่อีกครั้ง');
+    }
+    if (target.id === myId) return updateCheersBtn();
+    if (!(await hasProfile()) && !(await askNickname())) return updateCheersBtn(); // closed without a name: no cheer
+
+    const { error } = await supabase.from('cheers').insert({ to_profile: target.id });
+    if (error && error.code !== '23505') { // 23505 = already cheered (primary key)
+      updateCheersBtn();
+      return toast('ชนแก้วไม่สำเร็จ ลองใหม่อีกครั้ง');
+    }
+    cheered.add(target.id);
+    updateCheersBtn();
+    if (error) return toast('คุณชนแก้วกับคนนี้ไปแล้ว');
+
+    $('cheers-name').textContent = target.display_name;
+
+    // Player loads only when first needed; WASM served from our own origin, not a CDN.
+    const { setWasmUrl } = await import('@lottiefiles/dotlottie-wc');
+    setWasmUrl(wasmUrl);
+    dialog.showModal();
+    const anim = document.createElement('dotlottie-wc') as LottieEl;
+    anim.setAttribute('src', '/cheers.lottie');
+    anim.setAttribute('autoplay', '');
+    anim.className = 'block size-full';
+    $('cheers-anim').replaceChildren(anim); // connecting creates anim.dotLottie
+
+    const fallback = setTimeout(close, 8000); // never get stuck if the player fails
+    function close() {
+      clearTimeout(fallback);
+      fadeClose();
+    }
+    anim.dotLottie?.addEventListener('complete', close);
+    anim.dotLottie?.addEventListener('loadError', close);
+  }
+
+  // Fade out, then really close (focus returns to the cheers button).
+  function fadeClose() {
+    if (!dialog.open || dialog.hasAttribute('data-closing')) return;
+    dialog.setAttribute('data-closing', '');
+    const done = () => {
+      dialog.removeAttribute('data-closing');
+      dialog.close();
+    };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) done();
+    else dialog.addEventListener('animationend', done, { once: true });
+  }
+  dialog.addEventListener('click', fadeClose); // tap anywhere to skip
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault(); // Esc: fade out instead of vanishing
+    fadeClose();
+  });
+  dialog.addEventListener('close', () => $('cheers-anim').replaceChildren());
+  cheersBtn.addEventListener('click', () => cheers());
+  again.addEventListener('click', () => next());
+
+  // Swipe (touch) or drag (mouse) the card left/right for the next one.
+  const SWIPE = 90; // px past which a drag counts as a swipe
+  let startX: number | null = null;
+  let dx = 0;
+
+  card.addEventListener('pointerdown', (e) => {
+    if ((e.target as Element).closest('a, button')) return;
+    startX = e.clientX;
+    dx = 0;
+    card.setPointerCapture(e.pointerId);
+    card.style.transition = 'none';
+  });
+  card.addEventListener('pointermove', (e) => {
+    if (startX === null) return;
+    dx = e.clientX - startX;
+    card.style.translate = `${dx}px 0`;
+    card.style.rotate = `${dx / 20}deg`;
+  });
+  function release() {
+    if (startX === null) return;
+    startX = null;
+    card.style.transition = 'translate 200ms ease-out, rotate 200ms ease-out';
+    if (Math.abs(dx) < SWIPE) {
+      card.style.translate = card.style.rotate = ''; // snap back
+      return;
+    }
+    fling(Math.sign(dx));
+  }
+
+  // Swipe: fling off-screen fast (the finger already carried it). Keys: a calmer slide-and-fade.
+  function fling(dir: number, fromKey = false) {
+    const ms = fromKey ? 320 : 200;
+    card.style.transition = `translate ${ms}ms ease-in, rotate ${ms}ms ease-in, opacity ${ms}ms ease-in`;
+    card.style.translate = `${dir * (fromKey ? card.offsetWidth * 0.7 : innerWidth * 1.5)}px 0`;
+    card.style.rotate = `${dir * (fromKey ? 10 : 20)}deg`;
+    if (fromKey) card.style.opacity = '0';
+    setTimeout(() => next(dir), ms);
+  }
+
+  // Keyboard: ← / A swipe left, → / D swipe right. e.code so it also works on a Thai keyboard layout.
+  let flinging = false;
+  document.addEventListener('keydown', (e) => {
+    if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || flinging) return;
+    if (document.querySelector('dialog[open]')) return;
+    if ((e.target as Element).closest('input, textarea, select, [contenteditable]')) return;
+    const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : e.code === 'ArrowRight' || e.code === 'KeyD' ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    flinging = true;
+    fling(dir, true);
+    setTimeout(() => (flinging = false), 750); // let out + in animations finish: one card per press
+  });
+  card.addEventListener('pointerup', release);
+  card.addEventListener('pointercancel', release);
+  next();
+</script>
