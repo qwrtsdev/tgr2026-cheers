@@ -111,20 +111,63 @@ import { CONTACTS } from '../lib/contacts';
   <p class="-mt-2 text-xs/relaxed text-ink/60">
     ไม่ต้องสมัครสมาชิก การ์ดผูกกับเบราว์เซอร์นี้ ถ้าล้างข้อมูลเว็บไซต์จะกลับมาแก้การ์ดนี้ไม่ได้อีก
   </p>
-  <button id="delete" type="button" hidden
-    class="-mt-4 justify-self-start rounded px-1 py-2 text-sm text-ink/70 underline underline-offset-4 hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">
-    ลบการ์ดของฉัน
+  <button id="transfer-open" type="button" disabled
+    class="-mt-4 flex items-center gap-2 justify-self-start rounded px-1 py-2 text-sm font-semibold underline-offset-4 hover:underline disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">
+    <svg viewBox="0 0 24 24" aria-hidden="true" class="size-5 fill-none stroke-current" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" />
+    </svg>
+    ใช้บัญชีนี้บนอุปกรณ์อื่น (QR)
   </button>
+
+  <!-- Show a one-time QR/link that signs another device into this same account. -->
+  <dialog id="transfer-dialog" aria-labelledby="transfer-title" class="m-auto max-h-[90dvh] w-[min(calc(100vw-2rem),24rem)] overflow-y-auto overscroll-contain rounded-md bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40">
+    <div class="grid gap-4 p-7">
+      <div class="flex items-start gap-3">
+        <h2 id="transfer-title" class="min-w-0 flex-1 font-display text-2xl leading-[1.3] font-bold">ใช้บัญชีนี้บนอุปกรณ์อื่น</h2>
+        <button type="button" data-close aria-label="ปิด"
+          class="-mr-3 -mt-1 grid size-12 shrink-0 place-items-center rounded-md hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+      <p class="-mt-2 text-sm/relaxed">สแกนด้วยกล้องของอีกเครื่อง หรือส่งลิงก์ไปเปิด ทั้งสองเครื่องจะใช้บัญชีเดียวกันได้พร้อมกัน</p>
+      <div id="transfer-qr" class="mx-auto grid aspect-square w-full max-w-60 place-items-center rounded-md bg-white text-sm text-ink/60 [&>svg]:size-full" aria-label="QR โค้ดสำหรับย้ายบัญชี" role="img">
+        กำลังสร้าง…
+      </div>
+      <p id="transfer-error" role="status" class="text-sm font-semibold empty:hidden"></p>
+      <button id="transfer-copy" type="button" disabled
+        class="min-h-12 rounded-md bg-ink px-6 font-semibold text-cream disabled:opacity-60 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">คัดลอกลิงก์</button>
+      <p class="rounded-md bg-cream p-3 text-xs/relaxed">
+        ใช้ได้ครั้งเดียว · ห้ามแชร์ให้คนอื่น ใครได้ QR นี้ไปจะเข้าบัญชีคุณได้ · เปิดหน้านี้ใหม่จะได้ QR ใหม่และอันเก่าใช้ไม่ได้
+      </p>
+    </div>
+  </dialog>
+
+  <!-- Opened a transfer link: confirm before replacing this browser's account. -->
+  <dialog id="import-dialog" aria-labelledby="import-title" class="m-auto max-h-[90dvh] w-[min(calc(100vw-2rem),24rem)] overflow-y-auto overscroll-contain rounded-md bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40">
+    <div class="grid gap-4 p-7">
+      <h2 id="import-title" class="font-display text-2xl leading-[1.3] font-bold">ใช้บัญชีจาก QR?</h2>
+      <p class="text-sm/relaxed">เบราว์เซอร์นี้จะเปลี่ยนไปใช้บัญชีจาก QR แทนบัญชีปัจจุบัน</p>
+      <p id="import-loss" hidden class="rounded-md bg-cream p-3 text-sm/relaxed"></p>
+      <p id="import-error" role="status" class="text-sm font-semibold empty:hidden"></p>
+      <div class="grid gap-2">
+        <button id="import-ok" type="button"
+          class="min-h-12 rounded-md bg-ink px-6 font-semibold text-cream disabled:opacity-60 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">ใช้บัญชีจาก QR</button>
+        <button id="import-cancel" type="button"
+          class="min-h-12 rounded-md px-6 font-semibold underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">ยกเลิก ใช้บัญชีเดิม</button>
+      </div>
+    </div>
+  </dialog>
+
 </Layout>
 
 <script>
   import { supabase, avatarUrl } from '../lib/supabase';
   import { ensureSession } from '../lib/session';
+  import { createTransferCode, transferLink, readTransferFromUrl, clearTransferFromUrl, importTransfer } from '../lib/transfer';
   import { CONTACTS, CONTACT_COLUMNS } from '../lib/contacts';
 
   const form = document.getElementById('profile') as HTMLFormElement;
   const save = document.getElementById('save') as HTMLButtonElement;
-  const del = document.getElementById('delete') as HTMLButtonElement;
   const status = document.getElementById('status')!;
   const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;
   let userId = '';
@@ -232,7 +275,85 @@ import { CONTACTS } from '../lib/contacts';
     if (hasCard) saveAvatar(null);
   });
 
+  // ---- transfer: open this account on another device ----
+  const transferDialog = document.getElementById('transfer-dialog') as HTMLDialogElement;
+  const transferOpen = document.getElementById('transfer-open') as HTMLButtonElement;
+  const transferCopy = document.getElementById('transfer-copy') as HTMLButtonElement;
+  let link = '';
+  transferDialog.addEventListener('click', (e) => {
+    if (e.target === transferDialog || (e.target as Element).closest('[data-close]')) transferDialog.close();
+  });
+  transferOpen.addEventListener('click', async () => {
+    const qr = document.getElementById('transfer-qr')!;
+    const err = document.getElementById('transfer-error')!;
+    qr.textContent = 'กำลังสร้าง…';
+    err.textContent = '';
+    transferCopy.disabled = true;
+    transferDialog.showModal();
+    try {
+      const [code, { renderSVG }] = await Promise.all([createTransferCode(), import('uqr')]);
+      link = transferLink(code);
+      qr.innerHTML = renderSVG(link, { border: 2 }); // SVG generated locally from our own link
+      transferCopy.disabled = false;
+    } catch (e) {
+      qr.textContent = '';
+      err.textContent = `สร้าง QR ไม่สำเร็จ: ${(e as Error).message}`;
+    }
+  });
+  transferCopy.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(link);
+    transferCopy.textContent = 'คัดลอกแล้ว ✓';
+    setTimeout(() => (transferCopy.textContent = 'คัดลอกลิงก์'), 1500);
+  });
+
+  // Opened via a transfer link? Ask before replacing this browser's account. Resolves when decided.
+  async function maybeImport() {
+    const code = readTransferFromUrl();
+    if (!code) return;
+    const dialog = document.getElementById('import-dialog') as HTMLDialogElement;
+    const ok = document.getElementById('import-ok') as HTMLButtonElement;
+    const loss = document.getElementById('import-loss')!;
+    const err = document.getElementById('import-error')!;
+
+    // What would be left behind on this browser?
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session && session.user.email !== code.email) {
+      const { data: card } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
+      loss.hidden = false;
+      loss.textContent = session.user.is_anonymous
+        ? `บัญชีปัจจุบัน${card ? ` (การ์ด “${card.display_name}”)` : ''} ยังไม่เคยผูกกับอุปกรณ์อื่น ถ้าเปลี่ยนแล้วจะกลับมาใช้บัญชีนี้ไม่ได้อีก`
+        : `บัญชีปัจจุบัน${card ? ` (การ์ด “${card.display_name}”)` : ''} จะออกจากเบราว์เซอร์นี้ ถ้าต้องการกลับมา ต้องใช้ QR จากอุปกรณ์อื่นของบัญชีนั้น`;
+    }
+
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        clearTransferFromUrl();
+        dialog.close();
+        resolve();
+      };
+      document.getElementById('import-cancel')!.addEventListener('click', done, { once: true });
+      dialog.addEventListener('cancel', done, { once: true }); // Esc = keep current account
+      ok.addEventListener('click', async function go() {
+        ok.disabled = true;
+        err.textContent = '';
+        try {
+          await importTransfer(code);
+          done();
+        } catch (e) {
+          ok.disabled = false;
+          err.textContent = `ใช้ QR นี้ไม่ได้ (อาจถูกใช้ไปแล้วหรือสร้างใหม่แล้ว): ${(e as Error).message}`;
+          ok.addEventListener('click', go, { once: true });
+        }
+      }, { once: true });
+      dialog.showModal();
+    });
+  }
+
+  // Transfer link opened while already on /me (only the #hash changes, no reload): start over.
+  addEventListener('hashchange', () => readTransferFromUrl() && location.reload());
+
   async function init() {
+    await maybeImport();
     let session;
     try {
       const { data } = await supabase.auth.getSession();
@@ -244,6 +365,7 @@ import { CONTACTS } from '../lib/contacts';
       return;
     }
     userId = session.user.id;
+    transferOpen.disabled = false;
 
     const { data, error } = await supabase
       .from('profiles').select(`display_name, description, tgr_team_number, avatar_path, ${CONTACT_COLUMNS}`).eq('id', userId).maybeSingle();
@@ -256,7 +378,6 @@ import { CONTACTS } from '../lib/contacts';
       updateCount();
       savedAvatar = data.avatar_path;
       showAvatar(savedAvatar && avatarUrl(savedAvatar));
-      del.hidden = false;
       hasCard = true;
     }
     save.disabled = false;
@@ -317,7 +438,6 @@ import { CONTACTS } from '../lib/contacts';
       save.textContent = 'บันทึก';
       document.getElementById('saved-sr')!.textContent = '';
     }, 1600);
-    del.hidden = false;
     hasCard = true;
     const old = savedAvatar;
     savedAvatar = avatar_path;
@@ -326,22 +446,6 @@ import { CONTACTS } from '../lib/contacts';
     if (old && old !== avatar_path) supabase.storage.from('avatars').remove([old]); // best effort cleanup
   });
 
-  del.addEventListener('click', async () => {
-    if (!confirm('ลบการ์ดของคุณใช่ไหม? ลบแล้วกู้คืนไม่ได้')) return;
-    const { error } = await supabase.from('profiles').delete().eq('id', userId);
-    if (error) {
-      status.textContent = `ลบไม่สำเร็จ: ${error.message}`;
-      return;
-    }
-    if (savedAvatar) supabase.storage.from('avatars').remove([savedAvatar]);
-    savedAvatar = pendingAvatar = null;
-    showAvatar(null);
-    form.reset();
-    updateCount();
-    del.hidden = true;
-    hasCard = false;
-    status.textContent = 'ลบการ์ดแล้ว';
-  });
 
   init();
 </script>
