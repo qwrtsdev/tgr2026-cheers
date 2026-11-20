@@ -59,6 +59,7 @@ import { CONTACTS } from '../lib/contacts';
           <span class="sr-only">รูปโปรไฟล์ (ไม่บังคับ)</span>
           <input id="avatar" type="file" accept="image/*" class="sr-only" />
         </label>
+        <p id="avatar-msg" role="status" class="max-w-28 text-center text-xs/snug font-semibold empty:hidden"></p>
         <button id="avatar-remove" type="button" hidden class="min-h-8 rounded px-1 text-xs text-ink/70 underline underline-offset-2 hover:text-ink focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">ลบรูป</button>
       </div>
     </div>
@@ -199,6 +200,12 @@ import { CONTACTS } from '../lib/contacts';
   const avatarLabel = document.querySelector<HTMLLabelElement>('label[for="avatar"]')!;
 
   async function uploadAvatar(blob: Blob) {
+    // Clear leftovers from earlier failed/interrupted uploads first: the folder allows at most 3 files.
+    try {
+      const { data: files } = await supabase.storage.from('avatars').list(userId);
+      const stray = (Array.isArray(files) ? files : []).map((f) => `${userId}/${f.name}`).filter((f) => f !== savedAvatar);
+      if (stray.length) await supabase.storage.from('avatars').remove(stray);
+    } catch { /* best effort: never block the upload on cleanup */ }
     // New name every upload, so the year-long cache never shows a stale photo.
     const path = `${userId}/${Date.now()}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
     const { error } = await supabase.storage.from('avatars')
@@ -208,8 +215,12 @@ import { CONTACTS } from '../lib/contacts';
   }
 
   // Save (or remove, with null) the photo right away; old file is cleaned up after.
+  // Photo messages show right under the photo (the form status is far below it on phones).
+  const avatarMsg = document.getElementById('avatar-msg')!;
+
   async function saveAvatar(blob: Blob | null) {
     status.textContent = '';
+    avatarMsg.textContent = blob ? 'กำลังบันทึกรูป…' : '';
     avatarLabel.toggleAttribute('data-busy', true);
     try {
       const path = blob ? await uploadAvatar(blob) : null;
@@ -225,8 +236,9 @@ import { CONTACTS } from '../lib/contacts';
       avatarLabel.toggleAttribute('data-saved', true);
       document.getElementById('saved-sr')!.textContent = blob ? 'บันทึกรูปแล้ว' : 'ลบรูปแล้ว';
       setTimeout(() => avatarLabel.toggleAttribute('data-saved', false), 1200);
+      avatarMsg.textContent = '';
     } catch (e) {
-      status.textContent = `${blob ? 'บันทึกรูป' : 'ลบรูป'}ไม่สำเร็จ: ${(e as Error).message}`;
+      avatarMsg.textContent = `${blob ? 'บันทึกรูป' : 'ลบรูป'}ไม่สำเร็จ: ${(e as Error).message}`;
       showAvatar(savedAvatar && avatarUrl(savedAvatar)); // back to what's actually saved
     } finally {
       pendingAvatar = null;
@@ -263,9 +275,9 @@ import { CONTACTS } from '../lib/contacts';
       removeAvatar = false;
       showAvatar(URL.createObjectURL(pendingAvatar));
       if (hasCard) await saveAvatar(pendingAvatar);
-      else status.textContent = 'ใส่ชื่อเล่นแล้วกด "บันทึก" เพื่อสร้างการ์ดพร้อมรูปนี้';
+      else avatarMsg.textContent = 'ใส่ชื่อเล่นแล้วกด "บันทึก" เพื่อใช้รูปนี้';
     } catch {
-      status.textContent = 'เปิดรูปนี้ไม่ได้ ลองเลือกรูปอื่น';
+      avatarMsg.textContent = 'เปิดรูปนี้ไม่ได้ ลองเลือกรูปอื่น';
     }
   });
   removeBtn.addEventListener('click', () => {
