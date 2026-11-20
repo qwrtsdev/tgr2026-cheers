@@ -40,6 +40,9 @@
   will-change: transform;
   animation: bean-fall var(--dur) linear var(--delay) infinite;
 }
+.bean.trophy {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23c99a06' fill-rule='evenodd' d='M6 3h12v2h3v3a4 4 0 0 1-4 4h-.35A6 6 0 0 1 13 15.9V19h3v2H8v-2h3v-3.1A6 6 0 0 1 7.35 12H7a4 4 0 0 1-4-4V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.73V7Zm12 0v2.73A2 2 0 0 0 19 8V7h-1Z'/%3E%3C/svg%3E");
+}
 @keyframes bean-fall {
   from {
     transform: translate3d(0, -10vh, 0) rotate(0deg);
@@ -48,6 +51,17 @@
     transform: translate3d(var(--drift), 110vh, 0) rotate(var(--spin));
   }
 }
+/* Keep the top countdown ticking live during card view transitions (otherwise it freezes ~0.4s per swap). */
+.countdown-live {
+  view-transition-name: countdown;
+}
+::view-transition-old(countdown) {
+  display: none;
+}
+::view-transition-new(countdown) {
+  animation: none;
+}
+
 /* Keep beans falling live during card view transitions (no frozen snapshot, no duplicate fade). */
 #beans {
   view-transition-name: beans;
@@ -62,6 +76,48 @@
   #beans {
     display: none;
   }
+}
+
+/* PC keyboard hint: a small wiggle every few seconds while shown (uses `rotate`, so it doesn't fight Tailwind's translate). */
+[data-hint="keys"] .key-hint {
+  animation: key-wiggle 2.8s ease-in-out var(--wiggle-delay, 0s) infinite;
+}
+@keyframes key-wiggle {
+  0%, 24%, 100% { rotate: 0deg; }
+  4% { rotate: -8deg; }
+  10% { rotate: 7deg; }
+  16% { rotate: -4deg; }
+  21% { rotate: 2deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-hint="keys"] .key-hint { animation: none; }
+  [data-hint="swipe"] .swipe-hint { animation: none; }
+}
+
+/* Touch hint: finger presses, drags right, lifts, comes back. Transform-only, so it stays on the compositor. */
+[data-hint="swipe"] .swipe-hint {
+  animation: finger-swipe 2.2s ease-in-out infinite;
+}
+@keyframes finger-swipe {
+  0% { translate: -48px 0; scale: 1; rotate: 0deg; }
+  10% { translate: -48px 0; scale: 0.9; }            /* press */
+  55% { translate: 48px 0; scale: 0.9; rotate: 12deg; } /* drag right */
+  65% { translate: 48px 0; scale: 1; rotate: 12deg; }   /* lift */
+  100% { translate: -48px 0; scale: 1; rotate: 0deg; }
+}
+
+/* Profile photo zooms in when opened. */
+dialog[open] .photo-zoom {
+  animation: photo-zoom 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes photo-zoom {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog[open] .photo-zoom { animation: none; }
 }
 
 /* Card swap: old card is tossed left, new one slides in. */

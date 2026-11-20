@@ -1,0 +1,16 @@
+---
+// "X วัน HH:MM:SS" with one fixed-width slot per digit: digits change, layout never moves.
+// Filled in (every second) by the [data-countdown] ticker in index.astro.
+const { class: className = '' } = Astro.props;
+---
+
+<span data-countdown aria-hidden="true" class:list={['flex items-baseline tabular-nums', className]}>
+  <span data-d class="w-[0.6em] text-center">0</span>
+  <span class="mx-[0.3em]">วัน</span>
+  {[0, 1, 2].map((g) => (
+    <>
+      <span data-d class="w-[0.6em] text-center">0</span><span data-d class="w-[0.6em] text-center">0</span>
+      {g < 2 && <span class="w-[0.32em] text-center">:</span>}
+    </>
+  ))}
+</span>

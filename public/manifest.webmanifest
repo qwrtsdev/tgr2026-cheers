@@ -1,0 +1,17 @@
+{
+  "name": "TGR Cheers",
+  "short_name": "TGR Cheers",
+  "description": "สุ่มการ์ด หาเพื่อนใหม่ แล้วชนแก้วกัน",
+  "lang": "th",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff5e6",
+  "theme_color": "#fff5e6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,32 @@
+---
+// Falling background icons (coffee beans on the home page, trophies on the leaderboard).
+// Positions/timings are fixed at build time (seeded), and the motion is pure CSS (see .bean in global.css),
+// so nothing runs in JS per frame.
+interface Props {
+  kind?: 'bean' | 'trophy';
+}
+const { kind = 'bean' } = Astro.props;
+
+let seed = 7;
+const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+const items = Array.from({ length: 14 }, () => {
+  const dur = 9 + rand() * 8; // seconds per fall
+  return {
+    left: `${(rand() * 100).toFixed(1)}%`,
+    size: `${Math.round(18 + rand() * 16)}px`,
+    dur: `${dur.toFixed(1)}s`,
+    delay: `-${(rand() * dur).toFixed(1)}s`, // negative: already mid-fall on load
+    drift: `${Math.round(rand() * 80 - 40)}px`,
+    spin: `${Math.round((180 + rand() * 360) * (rand() < 0.5 ? -1 : 1))}deg`,
+  };
+});
+---
+
+<div id="beans" aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+  {items.map((b) => (
+    <span
+      class:list={['bean', kind === 'trophy' && 'trophy']}
+      style={`left:${b.left};--size:${b.size};--dur:${b.dur};--delay:${b.delay};--drift:${b.drift};--spin:${b.spin}`}
+    />
+  ))}
+</div>

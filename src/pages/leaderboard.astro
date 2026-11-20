@@ -1,16 +1,19 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import FallingIcons from '../components/FallingIcons.astro';
 ---
 
-<Layout title="อันดับการ์ด">
+<Layout title="ตารางอันดับ">
+  <FallingIcons kind="trophy" />
+
   <div id="loading" role="status" class="fixed inset-0 z-20 grid place-items-center bg-cream">
     <span class="size-10 animate-spin rounded-full border-4 border-coral border-t-transparent motion-reduce:animate-[spin_2s_linear_infinite]"></span>
     <span class="sr-only">กำลังโหลดอันดับ…</span>
   </div>
 
   <section aria-labelledby="title" class="w-full rounded-md bg-white p-7 shadow-xl shadow-ink/10">
-    <p class="font-display text-[1.2rem] font-bold italic text-coral">ชนแก้วมากที่สุด</p>
-    <h1 id="title" class="mt-1 font-display text-[clamp(2.2rem,10vw,3.05rem)] leading-[1.25] font-bold">อันดับการ์ด</h1>
+    <p class="font-sans text-[1.2rem] font-bold text-coral">ผู้ที่ถูกชนแก้วมากที่สุด</p>
+    <h1 id="title" class="mt-1 font-display text-[clamp(2.2rem,10vw,3.05rem)] leading-[1.25] font-bold">ตารางอันดับ</h1>
 
     <hr class="my-6 border-t-2 border-dashed border-cream-line" />
 
@@ -18,7 +21,7 @@ import Layout from '../layouts/Layout.astro';
     <p id="empty" hidden class="text-lg">ยังไม่มีใครได้ชนแก้วเลย</p>
   </section>
 
-  <a href="/" class="min-h-12 grid place-items-center rounded-md bg-ink px-4 font-semibold text-cream transition-transform hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink active:translate-y-0">
+  <a href="/" class="min-h-12 grid place-items-center rounded-md bg-ink px-4 font-semibold text-cream transition-transform focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink">
     กลับ
   </a>
 </Layout>
@@ -26,7 +29,7 @@ import Layout from '../layouts/Layout.astro';
 <script>
   import { supabase, avatarUrl } from '../lib/supabase';
 
-  type Row = { id: string; display_name: string; avatar_path: string | null; cheers: number };
+  type Row = { id: string; display_name: string; avatar_path: string | null; is_dev?: boolean; cheers: number };
   const list = document.getElementById('list')!;
   const empty = document.getElementById('empty')!;
 
@@ -50,8 +53,17 @@ import Layout from '../layouts/Layout.astro';
       pic.loading = 'lazy';
     }
     const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-lg font-semibold';
-    name.textContent = r.display_name;
+    name.className = 'flex min-w-0 flex-1 items-center gap-2';
+    const text = document.createElement('span');
+    text.className = 'min-w-0 truncate text-lg font-semibold';
+    text.textContent = r.display_name;
+    name.append(text);
+    if (r.is_dev) {
+      const dev = document.createElement('span');
+      dev.className = 'shrink-0 rounded bg-dev px-1.5 py-0.5 text-xs leading-none font-bold tracking-wide text-white';
+      dev.textContent = 'DEV';
+      name.append(dev);
+    }
     const count = document.createElement('span');
     count.className = 'shrink-0 font-semibold tabular-nums';
     count.textContent = `${r.cheers} แก้ว`;

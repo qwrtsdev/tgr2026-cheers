@@ -3,7 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import { CONTACTS } from '../lib/contacts';
 ---
 
-<Layout title="การ์ดของฉัน">
+<Layout title="การ์ดของฉัน" wide>
   <header class="flex items-center justify-between gap-4">
     <a href="/" class="-ml-2 flex min-h-12 items-center gap-1.5 rounded-md px-2 text-sm hover:underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">
       <svg viewBox="0 0 24 24" aria-hidden="true" class="size-5 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
@@ -13,12 +13,15 @@ import { CONTACTS } from '../lib/contacts';
 
   <div class="-mb-2">
     <h1 id="form-title" class="font-display text-[2.44rem] leading-[1.25] font-bold">การ์ดของคุณ</h1>
-    <p class="mt-1 text-sm/relaxed text-ink/70">หน้าตาเหมือนที่คนอื่นเห็น แก้ตรงไหนก็ได้แล้วกดบันทึก</p>
+    <p class="mt-1 text-sm/relaxed text-ink/70">ทุกคนจะเห็นโปรไฟล์คุณตามข้อมูลที่ใส่ไป เสร็จแล้วกดบันทึกข้างล่าง</p>
   </div>
 
   <!-- The form is laid out like the card itself, so you edit what people will see. -->
   <form id="profile" method="post" aria-labelledby="form-title" novalidate
-    class="grid w-full grid-cols-[minmax(0,1fr)] rounded-md bg-white p-7 shadow-xl shadow-ink/10">
+    class="grid w-full grid-cols-[minmax(0,1fr)] content-start rounded-md bg-white p-7 shadow-xl shadow-ink/10 md:grid-cols-2 md:gap-x-10 md:p-9">
+
+    <!-- Phone: one column. Wide screens: who you are (left) | how to reach you + save (right). -->
+    <div class="grid min-w-0 content-start">
 
     <div class="flex items-start gap-4">
       <div class="grid min-w-0 flex-1 gap-3">
@@ -40,7 +43,7 @@ import { CONTACTS } from '../lib/contacts';
 
       <div class="grid justify-items-center gap-1 pt-6">
         <label for="avatar"
-          class="group/av relative grid size-20 cursor-pointer place-items-center rounded-full bg-cream text-ink/50 transition-colors hover:text-coral has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink">
+          class="group/av relative grid size-20 cursor-pointer place-items-center rounded-full bg-cream text-ink/50 ring-green-700 ring-offset-2 transition-[color,box-shadow,opacity] hover:text-coral data-busy:animate-pulse data-busy:opacity-60 data-saved:ring-4 has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink">
           <img id="avatar-preview" alt="" hidden class="size-full rounded-full object-cover" />
           <span id="avatar-placeholder" class="contents">
             <svg viewBox="0 0 24 24" aria-hidden="true" class="size-8 fill-none stroke-current" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -48,7 +51,7 @@ import { CONTACTS } from '../lib/contacts';
             </svg>
           </span>
           <!-- camera badge -->
-          <span class="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full border-2 border-white bg-ink text-cream transition-transform group-hover/av:scale-110">
+          <span class="absolute -right-1 -bottom-1 grid size-8 place-items-center rounded-full border-2 border-white bg-ink text-cream transition-transform">
             <svg viewBox="0 0 24 24" aria-hidden="true" class="size-4 fill-none stroke-current" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" />
             </svg>
@@ -72,7 +75,10 @@ import { CONTACTS } from '../lib/contacts';
         class="field-sizing-content min-h-32 w-full resize-none rounded-md bg-cream/60 p-3 text-lg/relaxed outline-none ring-coral transition-shadow placeholder:text-ink/40 focus:ring-2"></textarea>
     </div>
 
-    <hr class="my-6 border-t-2 border-dashed border-cream-line" />
+    </div>
+
+    <div class="grid min-w-0 content-start md:border-l-2 md:border-dashed md:border-cream-line md:pl-10">
+    <hr class="my-6 border-t-2 border-dashed border-cream-line md:hidden" />
 
     <fieldset class="grid gap-2" aria-describedby="contacts-help">
       <legend class="text-sm text-ink/70">ช่องทางติดต่อ</legend>
@@ -95,10 +101,11 @@ import { CONTACTS } from '../lib/contacts';
     <p id="status" role="status" class="mt-6 text-sm font-semibold empty:hidden"></p>
 
     <button id="save" type="submit" disabled
-      class="mt-6 min-h-12 w-full rounded-md bg-ink px-7 font-semibold text-cream transition-[background-color,translate] duration-300 hover:-translate-y-0.5 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink active:translate-y-0 disabled:opacity-70 data-saved:bg-green-700 data-saved:opacity-100">
+      class="mt-6 min-h-12 w-full rounded-md bg-ink px-7 font-semibold text-cream transition-colors duration-300 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink disabled:opacity-70 data-saved:bg-green-700 data-saved:opacity-100">
       บันทึก
     </button>
     <span id="saved-sr" role="status" class="sr-only"></span>
+    </div>
   </form>
 
   <p class="-mt-2 text-xs/relaxed text-ink/60">
@@ -145,6 +152,45 @@ import { CONTACTS } from '../lib/contacts';
   let savedAvatar: string | null = null; // path currently stored on the card
   let pendingAvatar: Blob | null = null; // picked but not saved yet
   let removeAvatar = false;
+  let hasCard = false; // photo changes save instantly only once a card (with a name) exists
+  const avatarLabel = document.querySelector<HTMLLabelElement>('label[for="avatar"]')!;
+
+  async function uploadAvatar(blob: Blob) {
+    // New name every upload, so the year-long cache never shows a stale photo.
+    const path = `${userId}/${Date.now()}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`;
+    const { error } = await supabase.storage.from('avatars')
+      .upload(path, blob, { contentType: blob.type, cacheControl: '31536000' });
+    if (error) throw error;
+    return path;
+  }
+
+  // Save (or remove, with null) the photo right away; old file is cleaned up after.
+  async function saveAvatar(blob: Blob | null) {
+    status.textContent = '';
+    avatarLabel.toggleAttribute('data-busy', true);
+    try {
+      const path = blob ? await uploadAvatar(blob) : null;
+      const { error } = await supabase.from('profiles').update({ avatar_path: path }).eq('id', userId);
+      if (error) {
+        if (path) supabase.storage.from('avatars').remove([path]);
+        throw error;
+      }
+      const old = savedAvatar;
+      savedAvatar = path;
+      if (old && old !== path) supabase.storage.from('avatars').remove([old]); // best effort cleanup
+      // Brief green ring instead of a message.
+      avatarLabel.toggleAttribute('data-saved', true);
+      document.getElementById('saved-sr')!.textContent = blob ? 'บันทึกรูปแล้ว' : 'ลบรูปแล้ว';
+      setTimeout(() => avatarLabel.toggleAttribute('data-saved', false), 1200);
+    } catch (e) {
+      status.textContent = `${blob ? 'บันทึกรูป' : 'ลบรูป'}ไม่สำเร็จ: ${(e as Error).message}`;
+      showAvatar(savedAvatar && avatarUrl(savedAvatar)); // back to what's actually saved
+    } finally {
+      pendingAvatar = null;
+      removeAvatar = false;
+      avatarLabel.toggleAttribute('data-busy', false);
+    }
+  }
 
   function showAvatar(src: string | null) {
     preview.hidden = !src;
@@ -173,7 +219,8 @@ import { CONTACTS } from '../lib/contacts';
       pendingAvatar = await toSquareImage(file);
       removeAvatar = false;
       showAvatar(URL.createObjectURL(pendingAvatar));
-      status.textContent = 'กด "บันทึก" เพื่อใช้รูปนี้';
+      if (hasCard) await saveAvatar(pendingAvatar);
+      else status.textContent = 'ใส่ชื่อเล่นแล้วกด "บันทึก" เพื่อสร้างการ์ดพร้อมรูปนี้';
     } catch {
       status.textContent = 'เปิดรูปนี้ไม่ได้ ลองเลือกรูปอื่น';
     }
@@ -182,6 +229,7 @@ import { CONTACTS } from '../lib/contacts';
     pendingAvatar = null;
     removeAvatar = true;
     showAvatar(null);
+    if (hasCard) saveAvatar(null);
   });
 
   async function init() {
@@ -209,6 +257,7 @@ import { CONTACTS } from '../lib/contacts';
       savedAvatar = data.avatar_path;
       showAvatar(savedAvatar && avatarUrl(savedAvatar));
       del.hidden = false;
+      hasCard = true;
     }
     save.disabled = false;
   }
@@ -232,18 +281,17 @@ import { CONTACTS } from '../lib/contacts';
     status.textContent = '';
     save.textContent = 'กำลังบันทึก…';
 
+    // Only a photo picked before the card existed is still pending here.
     let avatar_path = removeAvatar ? null : savedAvatar;
     if (pendingAvatar) {
-      const path = `${userId}/${Date.now()}.${pendingAvatar.type === 'image/webp' ? 'webp' : 'jpg'}`;
-      const { error } = await supabase.storage.from('avatars')
-        .upload(path, pendingAvatar, { contentType: pendingAvatar.type, cacheControl: '31536000' });
-      if (error) {
+      try {
+        avatar_path = await uploadAvatar(pendingAvatar);
+      } catch (e) {
         save.disabled = false;
-        status.textContent = `อัปโหลดรูปไม่สำเร็จ: ${error.message}`;
+        status.textContent = `อัปโหลดรูปไม่สำเร็จ: ${(e as Error).message}`;
         save.textContent = 'บันทึก';
         return;
       }
-      avatar_path = path; // new name every upload, so the year-long cache never shows a stale photo
     }
 
     const { error } = await supabase.from('profiles').upsert({
@@ -270,6 +318,7 @@ import { CONTACTS } from '../lib/contacts';
       document.getElementById('saved-sr')!.textContent = '';
     }, 1600);
     del.hidden = false;
+    hasCard = true;
     const old = savedAvatar;
     savedAvatar = avatar_path;
     pendingAvatar = null;
@@ -290,6 +339,7 @@ import { CONTACTS } from '../lib/contacts';
     form.reset();
     updateCount();
     del.hidden = true;
+    hasCard = false;
     status.textContent = 'ลบการ์ดแล้ว';
   });
 
