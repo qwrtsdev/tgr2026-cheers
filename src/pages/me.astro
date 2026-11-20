@@ -137,7 +137,7 @@ import { CONTACTS } from '../lib/contacts';
       <button id="transfer-copy" type="button" disabled
         class="min-h-12 rounded-md bg-ink px-6 font-semibold text-cream disabled:opacity-60 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink">คัดลอกลิงก์</button>
       <p class="rounded-md bg-cream p-3 text-xs/relaxed">
-        ใช้ได้ครั้งเดียว · ห้ามแชร์ให้คนอื่น ใครได้ QR นี้ไปจะเข้าบัญชีคุณได้ · เปิดหน้านี้ใหม่จะได้ QR ใหม่และอันเก่าใช้ไม่ได้
+        ใช้ได้ครั้งเดียว ภายใน 1 ชั่วโมง · ห้ามแชร์ให้คนอื่น ใครได้ QR นี้ไปจะเข้าบัญชีคุณได้ · สร้าง QR ใหม่แล้วอันเก่าจะใช้ไม่ได้
       </p>
     </div>
   </dialog>
@@ -317,7 +317,7 @@ import { CONTACTS } from '../lib/contacts';
 
     // What would be left behind on this browser?
     const { data: { session } } = await supabase.auth.getSession();
-    if (session && session.user.email !== code.email) {
+    if (session) {
       const { data: card } = await supabase.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
       loss.hidden = false;
       loss.textContent = session.user.is_anonymous
@@ -341,7 +341,7 @@ import { CONTACTS } from '../lib/contacts';
           done();
         } catch (e) {
           ok.disabled = false;
-          err.textContent = `ใช้ QR นี้ไม่ได้ (อาจถูกใช้ไปแล้วหรือสร้างใหม่แล้ว): ${(e as Error).message}`;
+          err.textContent = `ใช้ QR นี้ไม่ได้ (อาจถูกใช้ไปแล้ว หมดอายุ หรือมี QR ใหม่กว่า) ให้สร้าง QR ใหม่จากเครื่องเดิม: ${(e as Error).message}`;
           ok.addEventListener('click', go, { once: true });
         }
       }, { once: true });

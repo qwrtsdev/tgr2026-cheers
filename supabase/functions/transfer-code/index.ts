@@ -1,10 +1,11 @@
-// Issues a one-time "transfer code" so the same account can sign in on another device.
+// Issues a one-time sign-in token so the same account can be opened on another device.
 //
-// Why not just share the current session? Supabase rotates refresh tokens: two devices sharing one
-// session trip reuse detection and BOTH get signed out. Instead we give the account a random password
-// (behind a synthetic, never-emailed address) and the new device signs in with it -> its own session.
-// Calling this again replaces the password, so any older QR stops working; the importing device calls
-// it right after signing in, which makes every QR single-use. Existing sessions are not affected.
+// - Not the current session: Supabase rotates refresh tokens, so two devices sharing one session
+//   trip reuse detection and BOTH get signed out.
+// - Not a password: changing a password signs out EVERY session of the account.
+// Instead: an admin-generated magic-link token (never emailed). The new device redeems it with
+// verifyOtp -> its own independent session. Tokens are single-use, expire (Auth > OTP expiry,
+// default 1h), and generating a new one invalidates the previous one. No existing session is touched.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const cors = {
@@ -19,21 +20,32 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false },
-  });
+  // Projects on the new API keys get SUPABASE_SECRET_KEYS (JSON); older ones SUPABASE_SERVICE_ROLE_KEY.
+  let serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}');
+    serviceKey = keys.default ?? Object.values(keys)[0] ?? serviceKey;
+  } catch { /* keep legacy key */ }
+  if (!serviceKey) return json({ error: 'server misconfigured: no service key' }, 500);
+
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey, { auth: { persistSession: false } });
 
   // Who is calling? Verified from their own access token.
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: { user }, error: authError } = await admin.auth.getUser(token);
-  if (authError || !user) return json({ error: 'unauthorized' }, 401);
+  if (authError || !user) return json({ error: `unauthorized: ${authError?.message ?? 'no user'}` }, 401);
 
-  const secret = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24))))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); // 192-bit, URL-safe
-  const email = `${user.id}@transfer.tgr-cheers.invalid`; // .invalid never resolves; no mail is ever sent
+  // Magic links need an email on the account. Give anonymous accounts a synthetic, confirmed one
+  // (no mail is ever sent). Setting an email does not sign anyone out.
+  let email = user.email;
+  if (!email) {
+    email = `${user.id}@users.tgr-cheers.qwrts.dev`;
+    const { error } = await admin.auth.admin.updateUserById(user.id, { email, email_confirm: true });
+    if (error) return json({ error: `set email: ${error.message}` }, 500);
+  }
 
-  const { error } = await admin.auth.admin.updateUserById(user.id, { email, password: secret, email_confirm: true });
-  if (error) return json({ error: error.message }, 500);
+  const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+  if (error || !data?.properties?.hashed_token) return json({ error: `generate link: ${error?.message ?? 'no token'}` }, 500);
 
-  return json({ email, secret });
+  return json({ token_hash: data.properties.hashed_token });
 });
