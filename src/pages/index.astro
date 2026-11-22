@@ -239,7 +239,7 @@ import DeviceNote from "../components/DeviceNote.astro";
       </svg>
     </button>
 
-    <!-- Swiped through everyone: same-size card, just a sleepy Zzz. -->
+    <!-- Cheered everyone: same-size card, just a sleepy Zzz. -->
     <div
       id="empty-deck"
       hidden
@@ -248,7 +248,7 @@ import DeviceNote from "../components/DeviceNote.astro";
       <span aria-hidden="true" class="zzz mb-2 flex items-end font-display font-bold text-coral">
         <span class="text-6xl">Z</span><span class="mb-8 text-4xl">z</span><span class="mb-14 text-2xl">z</span>
       </span>
-      <p class="font-display text-[1.9rem] leading-[1.3] font-bold">คุณปัดจนครบหมดแล้ว</p>
+      <p class="font-display text-[1.9rem] leading-[1.3] font-bold">คุณชนแก้วครบทุกคนแล้ว</p>
       <p class="text-lg">นี่เพื่อนเยอะเหมือนกันนะเนี่ย?</p>
     </div>
   </article>
@@ -633,25 +633,12 @@ import DeviceNote from "../components/DeviceNote.astro";
     return a;
   }
 
-  // Cards swiped away in card mode, kept in this browser: they're never dealt again.
-  const SEEN = "seen-cards";
-  const seen = new Set<string>(
-    (() => {
-      try {
-        return JSON.parse(localStorage.getItem(SEEN) ?? "[]");
-      } catch {
-        return [];
-      }
-    })(),
-  );
-  function markSeen(id: string) {
-    if (seen.has(id)) return;
-    seen.add(id);
-    try {
-      localStorage.setItem(SEEN, JSON.stringify([...seen]));
-    } catch {} // private mode: just forget after reload
-  }
-  const skip = (id: string) => seen.has(id) || cheered.has(id) || id === myId;
+  // Card mode deals everyone you haven't cheered yet, reshuffled each round, forever: swiping past someone
+  // only means "later". Cheered cards (and your own) drop out for good.
+  const skip = (id: string) => cheered.has(id) || id === myId;
+  try {
+    localStorage.removeItem("seen-cards"); // leftover from the old "swiped = gone for good" rule
+  } catch {}
 
   // Light on the DB: one tiny query for every card id (shuffled here), then whole cards a few at a time by primary key.
   // ponytail: one response holds at most PostgREST max_rows ids (1000 by default); page this past ~1000 cards.
@@ -946,7 +933,7 @@ import DeviceNote from "../components/DeviceNote.astro";
   let waiting = false;
   let deck: string[] = []; // shuffled ids not dealt yet
   let dealt = false;
-  let others = false; // are there cards besides your own? (decides "nobody yet" vs "you've seen everyone")
+  let others = false; // are there cards besides your own? (decides "nobody yet" vs "you've cheered everyone")
 
   function refill(extra = 0) {
     fetching ??= (async () => {
@@ -954,6 +941,7 @@ import DeviceNote from "../components/DeviceNote.astro";
       if (n <= 0) return;
       await Promise.race([cheeredReady, sleep(1500)]); // know who you cheered before the first deal (don't wait on a slow captcha)
       if (!deck.length) {
+        // New round (or the first): everyone not cheered, reshuffled; newcomers picked up too.
         const ids = await allIds(dealt);
         dealt = true;
         others = ids.some((id) => id !== myId);
@@ -985,7 +973,6 @@ import DeviceNote from "../components/DeviceNote.astro";
       String(dir ? -dir : 1),
     );
     if (waiting) return; // already waiting on the network; extra swipes are dropped
-    if (current) markSeen(current.id); // swiped away: gone for good
     const take = () => {
       while (queue.length && skip(queue[0].id)) queue.shift(); // cheered meanwhile
       return queue.shift() ?? null;
@@ -999,6 +986,8 @@ import DeviceNote from "../components/DeviceNote.astro";
         await refill(1);
         p = take();
       } while (!p && deck.length && !fetchError);
+      // Only the card on screen is left un-cheered: show it again rather than the Zzz.
+      if (!p && !fetchError && current && !skip(current.id)) p = current;
       waiting = false;
     } else if (dir) {
       card.style.viewTransitionName = "none"; // flung card is already off-screen
@@ -1012,13 +1001,15 @@ import DeviceNote from "../components/DeviceNote.astro";
   let shownError: string | null = null;
   function show(p: Profile | null, error: string | null = null) {
     const popup = !!card.closest("dialog");
+    // Set now, not inside the (async) view-transition callback: the background refill that runs right after
+    // must already know which card is on screen, or it can deal that same card again next.
+    current = p;
+    shownError = error;
     const update = () => {
       loading.hidden = true;
       card.style.viewTransitionName = "";
       card.style.transition = "none";
       card.style.translate = card.style.rotate = card.style.opacity = ""; // undo the swipe fling
-      current = p;
-      shownError = error;
       updateCheersBtn();
       $("empty-deck").hidden = !!(p || error || !others);
       if (error) return render("อุ๊ย", `โหลดการ์ดไม่สำเร็จ: ${error}`);
