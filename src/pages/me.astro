@@ -76,6 +76,27 @@ import { CONTACTS } from '../lib/contacts';
         class="field-sizing-content min-h-32 w-full resize-none rounded-md bg-cream/60 p-3 text-lg/relaxed outline-none ring-coral transition-shadow placeholder:text-ink/40 focus:ring-2"></textarea>
     </div>
 
+    <hr class="my-6 border-t-2 border-dashed border-cream-line" />
+
+    <!-- Favorite song: search Apple's catalog, pick one; shown on the card under the description. -->
+    <div class="grid gap-2">
+      <label for="song-search" class="text-sm text-ink/70">เพลงโปรด</label>
+      <div id="song-picked" hidden class="flex items-center gap-2 rounded-md bg-cream/60 p-2">
+        <span id="song-picked-info" class="contents"></span>
+        <button id="song-remove" type="button" aria-label="เอาเพลงออก"
+          class="grid size-10 shrink-0 place-items-center rounded-md text-ink/60 hover:bg-cream hover:text-ink focus-visible:outline-3 focus-visible:outline-ink">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="size-5 fill-none stroke-current" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </button>
+      </div>
+      <input id="song-search" type="search" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search"
+        placeholder="ค้นหาชื่อเพลง หรือศิลปิน" aria-describedby="song-help" aria-controls="song-results"
+        class="min-h-12 w-full min-w-0 border-b-2 border-cream-line bg-transparent outline-none transition-colors placeholder:text-ink/40 focus:border-coral" />
+      <p id="song-help" class="text-xs text-ink/60">ไม่บังคับ · TH/EN/JP</p>
+      <p id="song-status" role="status" class="text-sm font-semibold empty:hidden"></p>
+      <!-- At most 3 results tall (row = 48px cover + 2*6px padding = 60px, gap 4px); the rest scroll. -->
+      <ul id="song-results" aria-label="ผลการค้นหาเพลง" class="grid max-h-[11.75rem] gap-1 overflow-y-auto overscroll-contain empty:hidden"></ul>
+    </div>
+
     </div>
 
     <div class="grid min-w-0 content-start md:border-l-2 md:border-dashed md:border-cream-line md:pl-10">
@@ -166,6 +187,7 @@ import { CONTACTS } from '../lib/contacts';
   import { ensureSession } from '../lib/session';
   import { createTransferCode, transferLink, readTransferFromUrl, clearTransferFromUrl, importTransfer } from '../lib/transfer';
   import { CONTACTS, CONTACT_COLUMNS } from '../lib/contacts';
+  import { SONG_COLUMNS, searchSongs, songInfo, toSong, type Song } from '../lib/song';
 
   const form = document.getElementById('profile') as HTMLFormElement;
   const save = document.getElementById('save') as HTMLButtonElement;
@@ -287,6 +309,96 @@ import { CONTACTS } from '../lib/contacts';
     if (hasCard) saveAvatar(null);
   });
 
+  // ---- favorite song ----
+  const songSearch = document.getElementById('song-search') as HTMLInputElement;
+  const songResults = document.getElementById('song-results')!;
+  const songStatus = document.getElementById('song-status')!;
+  const songPicked = document.getElementById('song-picked')!;
+  let song: Song | null = null; // what the card will show
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchAbort: AbortController | null = null;
+
+  function showSong(s: Song | null) {
+    song = s;
+    songPicked.hidden = !s;
+    document.getElementById('song-picked-info')!.replaceChildren(...(s ? [songInfo(s)] : []));
+  }
+
+  // Search 300 ms after typing stops; a newer search cancels the older one.
+  songSearch.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchAbort?.abort();
+    const term = songSearch.value.trim();
+    if (term.length < 2) {
+      songResults.replaceChildren();
+      songStatus.textContent = '';
+      return;
+    }
+    searchTimer = setTimeout(async () => {
+      searchAbort = new AbortController();
+      songStatus.textContent = 'กำลังค้นหา…';
+      try {
+        const found = await searchSongs(term, searchAbort.signal);
+        songStatus.textContent = found.length ? '' : 'ไม่เจอเพลงนี้ ลองพิมพ์ชื่อเพลงหรือศิลปินแบบอื่น';
+        songResults.scrollTop = 0; // new search: back to the top result
+        songResults.replaceChildren(...found.map((s) => {
+          const li = document.createElement('li');
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'flex w-full min-w-0 items-center gap-3 rounded-md p-1.5 hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink';
+          b.setAttribute('aria-label', `เลือก ${s.song_title} – ${s.song_artist}`);
+          b.append(songInfo(s));
+          b.addEventListener('click', () => pickSong(s));
+          li.append(b);
+          return li;
+        }));
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return;
+        // Rate-limited / Apple unreachable: say so. The card keeps its current song (or none) untouched.
+        songStatus.textContent = (e as Error).message === 'rate-limit'
+          ? 'ค้นหาถี่เกินไป รอสักครู่แล้วลองใหม่นะ'
+          : 'ค้นหาเพลงไม่ได้ตอนนี้ ลองใหม่อีกครั้งภายหลัง';
+      }
+    }, 300);
+  });
+  // Enter in the search box must not submit the whole form: pick the top result instead.
+  songSearch.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    songResults.querySelector('button')?.click();
+  });
+
+  // Picked or removed: saved right away once the card exists (like the photo), else with "บันทึก".
+  async function pickSong(s: Song | null) {
+    clearTimeout(searchTimer);
+    searchAbort?.abort();
+    songSearch.value = '';
+    songResults.replaceChildren();
+    const before = song;
+    showSong(s);
+    if (!hasCard) {
+      songStatus.textContent = ''; // no card yet: saved together with the first "บันทึก"
+      return;
+    }
+    songStatus.textContent = 'กำลังบันทึกเพลง…';
+    const { error } = await supabase.from('profiles').update(songFields()).eq('id', userId);
+    if (error) {
+      showSong(before);
+      songStatus.textContent = `บันทึกเพลงไม่สำเร็จ: ${error.message}`;
+      return;
+    }
+    songStatus.textContent = '';
+    document.getElementById('saved-sr')!.textContent = s ? 'บันทึกเพลงแล้ว' : 'เอาเพลงออกแล้ว';
+    (s ? songPicked.querySelector('button') : songSearch)?.focus();
+  }
+  document.getElementById('song-remove')!.addEventListener('click', () => pickSong(null));
+  const songFields = () => ({
+    song_title: song?.song_title ?? null,
+    song_artist: song?.song_artist ?? null,
+    song_artwork_url: song?.song_artwork_url ?? null,
+    song_url: song?.song_url ?? null,
+  });
+
   // ---- transfer: open this account on another device ----
   const transferDialog = document.getElementById('transfer-dialog') as HTMLDialogElement;
   const transferOpen = document.getElementById('transfer-open') as HTMLButtonElement;
@@ -380,7 +492,7 @@ import { CONTACTS } from '../lib/contacts';
     transferOpen.disabled = false;
 
     const { data, error } = await supabase
-      .from('profiles').select(`display_name, description, tgr_team_number, avatar_path, ${CONTACT_COLUMNS}`).eq('id', userId).maybeSingle();
+      .from('profiles').select(`display_name, description, tgr_team_number, avatar_path, ${CONTACT_COLUMNS}, ${SONG_COLUMNS}`).eq('id', userId).maybeSingle();
     if (error) status.textContent = `โหลดการ์ดของคุณไม่สำเร็จ: ${error.message}`;
     if (data) {
       field('display_name').value = data.display_name;
@@ -390,6 +502,7 @@ import { CONTACTS } from '../lib/contacts';
       updateCount();
       savedAvatar = data.avatar_path;
       showAvatar(savedAvatar && avatarUrl(savedAvatar));
+      showSong(toSong(data));
       hasCard = true;
     }
     save.disabled = false;
@@ -434,6 +547,7 @@ import { CONTACTS } from '../lib/contacts';
       tgr_team_number: Number((form.elements.namedItem('tgr_team_number') as HTMLInputElement).value) || null,
       ...Object.fromEntries(CONTACTS.map((c) => [c.key, field(c.key).value || null])),
       description: field('description').value.trim(),
+      ...songFields(),
     });
     save.disabled = false;
     if (error) {

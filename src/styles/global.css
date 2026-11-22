@@ -285,3 +285,15 @@ html:has(#splash:not([hidden])) {
 @media (prefers-reduced-motion: reduce) {
   .podium-step { animation: none; }
 }
+
+/* Card song title too long to fit: roll left to the end, hold, blink, start over (rollTitle in lib/song.ts). */
+.song-roll {
+  animation: song-roll var(--roll-dur) linear infinite;
+}
+@keyframes song-roll {
+  0%, 15% { translate: 0; opacity: 1; }
+  75%, 85% { translate: var(--roll); opacity: 1; }
+  90% { translate: var(--roll); opacity: 0; }
+  90.01% { translate: 0; opacity: 0; }
+  100% { translate: 0; opacity: 1; }
+}

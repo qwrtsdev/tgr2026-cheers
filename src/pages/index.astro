@@ -64,10 +64,10 @@ import Splash from "../components/Splash.astro";
     </div>
 
     <div class="flex items-center gap-1">
-      <!-- Countdown to 29 Nov 2026 00:00 Bangkok time, ticking every second. -->
+      <!-- Countdown to 30 Nov 2026 23:59 Bangkok time, ticking every second. -->
       <p
         role="timer"
-        aria-label="นับถอยหลังถึงวันที่ 29 พฤศจิกายน 2569 เวลา 00:00 น."
+        aria-label="นับถอยหลังถึงวันที่ 30 พฤศจิกายน 2569 เวลา 23:59 น."
         class="font-sans text-lg font-semibold tabular-nums"
       >
         <Countdown class="countdown-live" />
@@ -159,6 +159,14 @@ import Splash from "../components/Splash.astro";
           อ่านเพิ่มเติม
         </button>
       </div>
+      <!-- Favorite song (cover, title, artist); links to Apple Music, nothing plays here. pr keeps it clear of the cheers corner. -->
+      <a
+        id="song"
+        hidden
+        target="_blank"
+        rel="noopener noreferrer"
+        class="-my-1 flex min-w-0 shrink-0 items-center gap-2 rounded-md py-1 pr-14 hover:text-coral focus-visible:outline-3 focus-visible:outline-ink"
+      ></a>
       <ul
         id="contacts"
         aria-label="ช่องทางติดต่อ"
@@ -251,7 +259,7 @@ import Splash from "../components/Splash.astro";
     <p id="tiles-end" role="status" class="pt-6 text-center text-ink/70 empty:hidden"></p>
   </section>
 
-  <!-- A tile opened: the same card, in a popup. Swipe it or tap outside to close. -->
+  <!-- A tile opened: the same card, in a popup (no swiping). X or tap outside to close. -->
   <dialog
     id="card-dialog"
     aria-label="การ์ด"
@@ -478,7 +486,7 @@ import Splash from "../components/Splash.astro";
     <!-- Countdown to shutdown -->
     <div
       role="timer"
-      aria-label="นับถอยหลังก่อนปิดระบบ ถึงวันที่ 29 พฤศจิกายน 2569 เวลา 00:00 น."
+      aria-label="นับถอยหลังก่อนปิดระบบ ถึงวันที่ 30 พฤศจิกายน 2569 เวลา 23:59 น."
       class="mx-7 mb-6 grid justify-items-center gap-1 rounded-md bg-coral px-4 py-5 text-center text-white"
     >
       <p class="text-sm font-semibold">นับถอยหลังก่อน Shutdown</p>
@@ -550,13 +558,9 @@ import Splash from "../components/Splash.astro";
 <script>
   import { supabase, avatarUrl } from "../lib/supabase";
   import { CONTACTS, type Contacts } from "../lib/contacts";
+  import { rollTitle, songInfo, toSong } from "../lib/song";
   import { ensureSession } from "../lib/session";
   import { irisSwap } from "../lib/iris";
-  import {
-    loadPlacements,
-    TRACK_LABEL,
-    type Placement,
-  } from "../lib/placements";
   import wasmUrl from "@lottiefiles/dotlottie-web/dotlottie-player.wasm?url";
 
   type Profile = Contacts & {
@@ -566,6 +570,10 @@ import Splash from "../components/Splash.astro";
     tgr_team_number: number | null;
     avatar_path: string | null;
     is_dev: boolean;
+    song_title: string | null;
+    song_artist: string | null;
+    song_artwork_url: string | null;
+    song_url: string | null;
   };
   type LottieEl = HTMLElement & {
     dotLottie: { addEventListener(e: string, f: () => void): void } | null;
@@ -726,66 +734,6 @@ import Splash from "../components/Splash.astro";
   }
 
   // textContent / attributes only: profile text is user input, never inject as HTML
-  // Podium cups next to the team number (1st gold, 2nd silver, 3rd bronze), one per track placed in.
-  const CUP =
-    "M6 3h12v2h3v3a4 4 0 0 1-4 4h-.35A6 6 0 0 1 13 15.9V19h3v2H8v-2h3v-3.1A6 6 0 0 1 7.35 12H7a4 4 0 0 1-4-4V5h3V3Zm0 4H5v1a2 2 0 0 0 1 1.73V7Zm12 0v2.73A2 2 0 0 0 19 8V7h-1Z";
-  const CUP_COLOR = {
-    1: "text-gold",
-    2: "text-silver",
-    3: "text-bronze",
-  } as const;
-  let placements = new Map<number, Placement[]>();
-  loadPlacements().then((m) => {
-    placements = m;
-    if (current?.tgr_team_number) addCups(current.tgr_team_number); // card already showing
-  });
-
-  // Each cup is a button; tap (or hover/focus on desktop) shows its category.
-  function addCups(teamNo: number) {
-    const team = $("team");
-    team.querySelectorAll("[data-cup]").forEach((c) => c.remove());
-    for (const { track, rank } of placements.get(teamNo) ?? []) {
-      const label = `อันดับ ${rank} · ${TRACK_LABEL[track]}`;
-      const wrap = document.createElement("span");
-      wrap.className = "group/cup relative inline-flex first-of-type:ml-1.5"; // cups sit snug together, a little gap after the text
-      wrap.dataset.cup = "";
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.setAttribute("aria-label", label);
-      btn.setAttribute("aria-expanded", "false");
-      btn.className =
-        "-mx-1.5 -my-1 grid size-8 place-items-center rounded-full hover:bg-cream focus-visible:outline-3 focus-visible:outline-ink";
-      const svg = icon(CUP);
-      svg.setAttribute("class", `size-5 fill-current ${CUP_COLOR[rank]}`);
-      const tip = document.createElement("span");
-      tip.setAttribute("role", "tooltip");
-      tip.textContent = label;
-      tip.className =
-        "pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-xs font-semibold text-cream group-data-open/cup:block pointer-fine:group-hover/cup:block";
-      btn.addEventListener("click", () => {
-        const open = !wrap.hasAttribute("data-open");
-        closeTips();
-        wrap.toggleAttribute("data-open", open);
-        btn.setAttribute("aria-expanded", String(open));
-      });
-      btn.append(svg);
-      wrap.append(btn, tip);
-      team.append(wrap);
-    }
-  }
-  function closeTips() {
-    document.querySelectorAll("[data-cup][data-open]").forEach((w) => {
-      w.removeAttribute("data-open");
-      w.querySelector("button")?.setAttribute("aria-expanded", "false");
-    });
-  }
-  document.addEventListener("click", (e) => {
-    if (!(e.target as Element).closest("[data-cup]")) closeTips(); // tap elsewhere closes the tooltip
-  });
-  document.addEventListener(
-    "keydown",
-    (e) => e.key === "Escape" && closeTips(),
-  );
 
   function render(name: string, description: string, p: Profile | null = null) {
     $("name-text").textContent = name;
@@ -805,7 +753,6 @@ import Splash from "../components/Splash.astro";
     team.textContent = p?.tgr_team_number
       ? `ทีม Top Gun #${p.tgr_team_number}`
       : "";
-    if (p?.tgr_team_number) addCups(p.tgr_team_number);
     // Only show channels whose value is valid (DB enforces this too; re-check before using as href).
     const items = CONTACTS.flatMap((c) => {
       const v = p?.[c.key];
@@ -820,6 +767,22 @@ import Splash from "../components/Splash.astro";
       items.push(li);
     }
     $("contacts").replaceChildren(...items);
+
+    const song = toSong(p); // re-checked like the DB does before use as src / href
+    const songEl = $("song") as HTMLAnchorElement;
+    songEl.hidden = !song;
+    if (song) {
+      // Links to Apple Music when the song has a link; otherwise plain text.
+      if (song.song_url) {
+        songEl.href = song.song_url;
+        songEl.setAttribute("aria-label", `เพลงโปรด: ${song.song_title} – ${song.song_artist} (เปิดใน Apple Music)`);
+      } else {
+        songEl.removeAttribute("href");
+        songEl.removeAttribute("aria-label");
+      }
+      songEl.replaceChildren(songInfo(song));
+      rollTitle(songEl);
+    } else songEl.replaceChildren();
 
     // Card height is fixed: offer the full text only when the description doesn't fit.
     const desc = $("description");
@@ -1397,7 +1360,7 @@ import Splash from "../components/Splash.astro";
   card.addEventListener("pointerdown", (e) => {
     card.removeAttribute("data-hint"); // touched the card: they've found it
     clearTimeout(hintTimer);
-    if ((e.target as Element).closest("a, button")) return;
+    if ((e.target as Element).closest("a, button") || cardDialog.open) return; // popup card (tiles): no swiping
     startX = e.clientX;
     dx = 0;
     card.setPointerCapture(e.pointerId);
@@ -1417,7 +1380,6 @@ import Splash from "../components/Splash.astro";
       card.style.translate = card.style.rotate = ""; // snap back
       return;
     }
-    if (cardDialog.open) return cardDialog.close(); // popup card: swipe = close
     fling(Math.sign(dx));
   }
 
@@ -1482,8 +1444,8 @@ import Splash from "../components/Splash.astro";
   card.addEventListener("pointerup", release);
   card.addEventListener("pointercancel", release);
   // ---- countdown ----
-  // Fixed instant: 2026-11-29 00:00 in Bangkok (UTC+7). Computed from the clock each tick, so it never drifts.
-  const DEADLINE = Date.parse("2026-11-29T00:00:00+07:00");
+  // Fixed instant: 2026-11-30 23:59 in Bangkok (UTC+7). Computed from the clock each tick, so it never drifts.
+  const DEADLINE = Date.parse("2026-11-30T23:59:00+07:00");
   const pad = (n: number) => String(n).padStart(2, "0");
   // Checked every frame (cheap), written only when the second changes, and only the digits that changed.
   // rAF also pauses by itself in background tabs.
