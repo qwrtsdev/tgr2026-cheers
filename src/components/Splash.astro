@@ -1,0 +1,16 @@
+---
+// Opening screen: coral, "Top Gun Rally 2026", then a cartoon iris opens from the center to reveal the page.
+// Plays on every visit to the home page. Reused (without words) for switching card/tile mode: see lib/iris.ts.
+// Styles (iris mask, word pop) live in global.css.
+---
+
+<div id="splash" aria-hidden="true" class="fixed inset-0 z-50 grid place-items-center bg-coral text-white">
+  <p class="splash-text grid text-center font-display text-[clamp(3.5rem,18vw,7rem)] leading-[0.95] font-bold">
+    {['Top', 'Gun', 'Rally', '2026'].map((w, i) => <span style={`--i:${i}`}>{w}</span>)}
+  </p>
+</div>
+
+<script>
+  import { intro } from '../lib/iris';
+  intro(1500); // hold 1.5 s (the page loads underneath meanwhile), then open
+</script>

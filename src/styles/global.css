@@ -172,3 +172,116 @@ dialog[data-closing]::backdrop {
     animation: none !important;
   }
 }
+
+/* Out-of-cards Zzz: letters bob one after another. */
+.zzz > span {
+  animation: zzz 2.4s ease-in-out infinite;
+}
+.zzz > span:nth-child(2) { animation-delay: 0.3s; }
+.zzz > span:nth-child(3) { animation-delay: 0.6s; }
+@keyframes zzz {
+  0%, 100% { translate: 0 0; opacity: 0.55; }
+  50% { translate: 0 -6px; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zzz > span { animation: none; }
+}
+
+/* ---- Opening splash (Splash.astro) ---- */
+/* No scrollbar while the splash covers the page. The scrollbar's space is always reserved (stable gutter), so the
+   page never shifts sideways when it comes back; during the splash that space is painted coral like the splash. */
+html {
+  scrollbar-gutter: stable;
+}
+html:has(#splash:not([hidden])) {
+  overflow: hidden;
+  background: var(--color-coral);
+}
+/* Words pop in one after another, cartoon-style. */
+.splash-text > span {
+  animation: splash-word 520ms cubic-bezier(0.3, 1.6, 0.5, 1) calc(var(--i) * 90ms + 120ms) both;
+}
+@keyframes splash-word {
+  from {
+    opacity: 0;
+    translate: 0 0.5em;
+    scale: 0.6;
+  }
+}
+/* Then they shrink away... */
+#splash[data-open] .splash-text {
+  animation: splash-text-out 200ms ease-in forwards;
+}
+@keyframes splash-text-out {
+  to {
+    scale: 0;
+    opacity: 0;
+  }
+}
+/* ...and a circular hole opens from the center: small, a beat, then wide (a reversed cartoon iris-out). */
+@property --iris {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+#splash {
+  mask-image: radial-gradient(circle at 50% 50%, transparent var(--iris), #000 calc(var(--iris) + 1px));
+}
+#splash[data-open] {
+  pointer-events: none;
+  animation: iris-open 950ms cubic-bezier(0.65, 0, 0.35, 1) 180ms forwards;
+}
+/* Mode switch: no words, the iris closes in (wide, a beat on a small circle, shut), then opens again. */
+#splash[data-switch] .splash-text {
+  display: none;
+}
+#splash[data-closing] {
+  animation: iris-close 650ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+#splash[data-switch][data-open] {
+  animation-duration: 800ms;
+  animation-delay: 0s;
+}
+@keyframes iris-close {
+  0% { --iris: 75vmax; }
+  45%, 70% { --iris: 3.5rem; }
+  100% { --iris: 0px; }
+}
+@keyframes iris-open {
+  0% { --iris: 0px; }
+  30%, 55% { --iris: 3.5rem; }
+  100% { --iris: 75vmax; } /* center to corner is at most ~71vmax */
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-text > span,
+  #splash[data-open] .splash-text {
+    animation: none;
+  }
+  #splash[data-open] {
+    animation: fade-out 300ms ease-out forwards;
+  }
+}
+
+/* Tile scroller: tiles fade out at its top/bottom edges instead of sliding under the bars.
+   No scrollbar: the list is endless, so its position means nothing. Wheel, touch and keys still scroll. */
+.tiles-scroll {
+  mask-image: linear-gradient(transparent, #000 1rem, #000 calc(100% - 1rem), transparent);
+  scrollbar-width: none;
+}
+.tiles-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Leaderboard podium: blocks rise from the floor, 3rd first, the winner last. */
+.podium-step {
+  transform-origin: bottom;
+  animation: podium-rise 600ms cubic-bezier(0.3, 1.4, 0.5, 1) calc((3 - var(--step)) * 150ms + 100ms) both;
+}
+@keyframes podium-rise {
+  from {
+    scale: 1 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium-step { animation: none; }
+}

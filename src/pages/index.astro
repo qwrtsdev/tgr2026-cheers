@@ -2,10 +2,12 @@
 import Layout from "../layouts/Layout.astro";
 import Countdown from "../components/Countdown.astro";
 import FallingIcons from "../components/FallingIcons.astro";
+import Splash from "../components/Splash.astro";
 
 ---
 
 <Layout title="">
+  <Splash />
   <FallingIcons />
 
   <h1 class="sr-only">พบเพื่อนใหม่</h1>
@@ -19,7 +21,22 @@ import FallingIcons from "../components/FallingIcons.astro";
     <span class="sr-only">กำลังโหลดการ์ด…</span>
   </div>
 
-  <div class="-mb-3 flex items-center justify-between">
+  <div id="topbar" class="-mb-3 flex items-center justify-between">
+    <div class="flex items-center gap-1">
+    <!-- View switch: swipe cards / scrolling tiles. The icon shows the view you'd switch to. Remembered per browser. -->
+    <button
+      id="mode-btn"
+      type="button"
+      class="-ml-3 grid size-12 place-items-center rounded-full text-ink/70 hover:text-ink focus-visible:outline-3 focus-visible:outline-ink"
+    >
+      <svg data-icon="tiles" viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="1.8" stroke-linejoin="round">
+        <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+        <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+      </svg>
+      <svg data-icon="card" hidden viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8.5 8h7M8.5 12h4" />
+      </svg>
+    </button>
     <!-- How many people cheered you; tap to see who. -->
     <button
       id="stats"
@@ -44,6 +61,7 @@ import FallingIcons from "../components/FallingIcons.astro";
       </svg>
       <span id="stats-text">0</span>
     </button>
+    </div>
 
     <div class="flex items-center gap-1">
       <!-- Countdown to 29 Nov 2026 00:00 Bangkok time, ticking every second. -->
@@ -211,9 +229,47 @@ import FallingIcons from "../components/FallingIcons.astro";
         </g>
       </svg>
     </button>
+
+    <!-- Swiped through everyone: same-size card, just a sleepy Zzz. -->
+    <div
+      id="empty-deck"
+      hidden
+      class="absolute inset-0 z-10 grid place-content-center justify-items-center gap-2 rounded-md bg-white p-7 text-center"
+    >
+      <span aria-hidden="true" class="zzz mb-2 flex items-end font-display font-bold text-coral">
+        <span class="text-6xl">Z</span><span class="mb-8 text-4xl">z</span><span class="mb-14 text-2xl">z</span>
+      </span>
+      <p class="font-display text-[1.9rem] leading-[1.3] font-bold">คุณปัดจนครบหมดแล้ว</p>
+      <p class="text-lg">นี่เพื่อนเยอะเหมือนกันนะเนี่ย?</p>
+    </div>
   </article>
 
-  <div class="-mt-3 flex items-center justify-between gap-3">
+  <!-- Tile view: everyone in a grid, more load as you scroll. -->
+  <section id="tiles" hidden aria-label="เพื่อนทุกคน" class="tiles-scroll -mx-4 overflow-y-auto overscroll-contain px-4 py-4">
+    <ul id="tile-list" class="grid grid-cols-2 gap-3 md:grid-cols-3"></ul>
+    <p id="tiles-end" role="status" class="pt-6 text-center text-ink/70 empty:hidden"></p>
+    <div id="tiles-more" aria-hidden="true" class="h-px"></div>
+  </section>
+
+  <!-- A tile opened: the same card, in a popup. Swipe it or tap outside to close. -->
+  <dialog
+    id="card-dialog"
+    aria-label="การ์ด"
+    class="m-auto w-[min(calc(100vw-2rem),24rem)] overflow-visible bg-transparent p-0 text-ink backdrop:bg-ink/40"
+  >
+    <button
+      type="button"
+      data-close
+      aria-label="ปิด"
+      class="absolute -top-14 -right-3 grid size-12 place-items-center rounded-full text-white drop-shadow-md focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="size-6 fill-none stroke-current" stroke-width="2" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  </dialog>
+
+  <div id="nav" class="-mt-3 flex items-center justify-between gap-3">
     <a
       href="/me"
       class="flex min-h-12 items-center gap-2 whitespace-nowrap text-sm text-ink underline-offset-4 hover:underline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink"
@@ -495,6 +551,7 @@ import FallingIcons from "../components/FallingIcons.astro";
   import { supabase, avatarUrl } from "../lib/supabase";
   import { CONTACTS, type Contacts } from "../lib/contacts";
   import { ensureSession } from "../lib/session";
+  import { irisSwap } from "../lib/iris";
   import {
     loadPlacements,
     TRACK_LABEL,
@@ -544,7 +601,7 @@ import FallingIcons from "../components/FallingIcons.astro";
 
   // Every visitor gets an (anonymous, hCaptcha-checked) account right away, so stats and cheers just work.
   // Runs alongside the first card load; returning visitors reuse the stored session instantly.
-  ensureSession()
+  const cheeredReady = ensureSession()
     .then(async (session) => {
       myId = session.user.id;
       // ponytail: loads all of this user's cheers; fine for hundreds of cards.
@@ -555,8 +612,62 @@ import FallingIcons from "../components/FallingIcons.astro";
       for (const r of data ?? []) cheered.add(r.to_profile);
       updateCheersBtn();
       refreshStats();
+      $("tile-list").querySelectorAll(`[data-id="${myId}"]`).forEach((t) => t.remove()); // never your own tile
     })
     .catch(() => {}); // captcha/network failed: cheering retries sign-in later
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  function shuffle<T>(a: T[]) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // Cards swiped away in card mode, kept in this browser: they're never dealt again.
+  const SEEN = "seen-cards";
+  const seen = new Set<string>(
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(SEEN) ?? "[]");
+      } catch {
+        return [];
+      }
+    })(),
+  );
+  function markSeen(id: string) {
+    if (seen.has(id)) return;
+    seen.add(id);
+    try {
+      localStorage.setItem(SEEN, JSON.stringify([...seen]));
+    } catch {} // private mode: just forget after reload
+  }
+  const skip = (id: string) => seen.has(id) || cheered.has(id) || id === myId;
+
+  // Light on the DB: one tiny query for every card id (shuffled here), then whole cards a few at a time by primary key.
+  // ponytail: one response holds at most PostgREST max_rows ids (1000 by default); page this past ~1000 cards.
+  let idList: Promise<string[]> | null = null;
+  let idsAt = 0;
+  function allIds(refresh = false) {
+    if (refresh && Date.now() - idsAt > 30_000) idList = null; // look for newcomers, at most every 30s
+    idList ??= (async () => {
+      const { data, error } = await supabase.from("profiles").select("id");
+      if (error) {
+        idList = null;
+        throw new Error(error.message);
+      }
+      idsAt = Date.now();
+      return data.map((r) => r.id as string);
+    })();
+    return idList;
+  }
+  async function fetchProfiles(ids: string[]) {
+    const { data, error } = await supabase.from("profiles").select("*").in("id", ids);
+    if (error) throw new Error(error.message);
+    const byId = new Map((data as Profile[]).map((p) => [p.id, p]));
+    return ids.flatMap((id) => byId.get(id) ?? []); // keep the shuffled order
+  }
 
   function icon(path: string) {
     const ns = "http://www.w3.org/2000/svg";
@@ -728,7 +839,7 @@ import FallingIcons from "../components/FallingIcons.astro";
 
   // Popups: the X button or a tap on the dimmed backdrop closes them.
   for (const d of document.querySelectorAll<HTMLDialogElement>(
-    "#desc-dialog, #cheerers-dialog, #name-dialog, #info-dialog, #photo-dialog",
+    "#desc-dialog, #cheerers-dialog, #name-dialog, #info-dialog, #photo-dialog, #card-dialog",
   )) {
     d.addEventListener("click", (e) => {
       if (e.target === d || (e.target as Element).closest("[data-close]"))
@@ -850,8 +961,7 @@ import FallingIcons from "../components/FallingIcons.astro";
           "min-h-10 shrink-0 rounded-md bg-ink px-4 text-sm font-semibold text-cream transition-transform focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink";
         visit.addEventListener("click", () => {
           cheerersDialog.close();
-          document.documentElement.style.setProperty("--enter", "1");
-          show(p);
+          openCard(p);
         });
         li.append(name, visit);
         return li;
@@ -871,28 +981,37 @@ import FallingIcons from "../components/FallingIcons.astro";
   let fetching: Promise<void> | null = null;
   let fetchError: string | null = null;
   let waiting = false;
+  let deck: string[] = []; // shuffled ids not dealt yet
+  let dealt = false;
+  let others = false; // are there cards besides your own? (decides "nobody yet" vs "you've seen everyone")
 
   function refill(extra = 0) {
     fetching ??= (async () => {
       const n = AHEAD + extra - queue.length;
       if (n <= 0) return;
-      const exclude = [current, ...queue].flatMap((q) => (q ? [q.id] : []));
-      let { data, error } = await supabase.rpc("random_profiles", {
-        exclude,
-        n,
-      });
-      // Fewer cards in the DB than we want queued: allow repeats so swiping never dead-ends.
-      if (!error && !data?.length)
-        ({ data, error } = await supabase.rpc("random_profiles", {
-          exclude: [],
-          n,
-        }));
-      fetchError = error?.message ?? null;
-      const fresh = (data ?? []) as Profile[];
+      await Promise.race([cheeredReady, sleep(1500)]); // know who you cheered before the first deal (don't wait on a slow captcha)
+      if (!deck.length) {
+        const ids = await allIds(dealt);
+        dealt = true;
+        others = ids.some((id) => id !== myId);
+        const inPlay = new Set([current?.id, ...queue.map((q) => q.id)]);
+        deck = shuffle(ids.filter((id) => !skip(id) && !inPlay.has(id)));
+      }
+      const batch: string[] = [];
+      while (batch.length < n && deck.length) {
+        const id = deck.pop()!;
+        if (!skip(id)) batch.push(id);
+      }
+      if (!batch.length) return;
+      const fresh = await fetchProfiles(batch);
       queue.push(...fresh);
-      for (const q of fresh)
-        if (q.avatar_path) new Image().src = avatarUrl(q.avatar_path); // preload photos too
-    })().finally(() => (fetching = null));
+      for (const q of fresh) if (q.avatar_path) new Image().src = avatarUrl(q.avatar_path); // preload photos too
+    })()
+      .then(
+        () => (fetchError = null),
+        (e: Error) => (fetchError = e.message),
+      )
+      .finally(() => (fetching = null));
     return fetching;
   }
 
@@ -903,38 +1022,227 @@ import FallingIcons from "../components/FallingIcons.astro";
       String(dir ? -dir : 1),
     );
     if (waiting) return; // already waiting on the network; extra swipes are dropped
-    if (!queue.length) {
+    if (current) markSeen(current.id); // swiped away: gone for good
+    const take = () => {
+      while (queue.length && skip(queue[0].id)) queue.shift(); // cheered meanwhile
+      return queue.shift() ?? null;
+    };
+    let p = take();
+    if (!p) {
       waiting = true;
       loading.hidden = false;
       card.style.viewTransitionName = "none"; // card is under the overlay: only animate the new one in
-      await refill(1);
+      do {
+        await refill(1);
+        p = take();
+      } while (!p && deck.length && !fetchError);
       waiting = false;
     } else if (dir) {
       card.style.viewTransitionName = "none"; // flung card is already off-screen
     }
 
-    const p = queue.shift() ?? null;
     show(p, p ? null : fetchError);
     refill(); // top the queue back up in the background
   }
 
   // Put a profile in the middle (random draw, or one picked from the "who cheered me" list).
+  let shownError: string | null = null;
   function show(p: Profile | null, error: string | null = null) {
+    const popup = !!card.closest("dialog");
     const update = () => {
       loading.hidden = true;
       card.style.viewTransitionName = "";
       card.style.transition = "none";
       card.style.translate = card.style.rotate = card.style.opacity = ""; // undo the swipe fling
       current = p;
+      shownError = error;
       updateCheersBtn();
+      $("empty-deck").hidden = !!(p || error || !others);
       if (error) return render("อุ๊ย", `โหลดการ์ดไม่สำเร็จ: ${error}`);
-      if (!p) return render("ยังไม่มีใครเลย", "มาเป็นคนแรกกันเถอะ สร้างการ์ดของคุณเลย");
+      if (!p) return others ? render("", "") : render("ยังไม่มีใครเลย", "มาเป็นคนแรกกันเถอะ สร้างการ์ดของคุณเลย");
       render(p.display_name, p.description || "—", p);
-      armHint();
+      if (!popup) armHint();
     };
-    // Animated swap where supported; plain swap elsewhere.
-    if (document.startViewTransition) document.startViewTransition(update);
+    // Animated swap where supported; plain swap elsewhere (and in the popup / while hidden / under the splash,
+    // whose view-transition snapshots would otherwise paint the card above it).
+    if (document.startViewTransition && !popup && !card.hidden && $("splash").hidden) document.startViewTransition(update);
     else update();
+  }
+
+  // ---- view mode: swipe cards / tiles ----
+  type Mode = "card" | "tiles";
+  const MODE = "view-mode";
+  let mode: Mode = (() => {
+    try {
+      return localStorage.getItem(MODE) === "tiles" ? "tiles" : "card";
+    } catch {
+      return "card";
+    }
+  })();
+  let cardStarted = false;
+  const modeBtn = $("mode-btn");
+  const nav = $("nav");
+  function setMode(m: Mode) {
+    mode = m;
+    try {
+      localStorage.setItem(MODE, m);
+    } catch {}
+    const tiles = m === "tiles";
+    card.hidden = tiles;
+    again.hidden = tiles;
+    $("tiles").hidden = !tiles;
+    // Tiles: the page becomes one screen tall (top bar / tile scroller / links), and only the tiles scroll.
+    // The bars need no background, so the falling beans show behind them while tiles never pass under them.
+    const main = document.querySelector("main")!;
+    for (const c of ["md:max-w-3xl", "h-dvh", "grid-rows-[auto_minmax(0,1fr)_auto]", "content-stretch", "py-4"]) main.classList.toggle(c, tiles);
+    for (const c of ["content-center", "py-10"]) main.classList.toggle(c, !tiles);
+    modeBtn.querySelector<SVGElement>("[data-icon=tiles]")!.toggleAttribute("hidden", tiles);
+    modeBtn.querySelector<SVGElement>("[data-icon=card]")!.toggleAttribute("hidden", !tiles);
+    modeBtn.setAttribute("aria-label", tiles ? "เปลี่ยนเป็นแบบปัดการ์ด" : "เปลี่ยนเป็นแบบตาราง");
+    if (tiles) moreTiles();
+    else if (!cardStarted) {
+      cardStarted = true;
+      next();
+    }
+  }
+  modeBtn.addEventListener("click", () => irisSwap(() => setMode(mode === "card" ? "tiles" : "card")));
+
+  // Card mode: show it in place. Tile mode: the same card element, moved into a popup for a moment.
+  const cardDialog = $("card-dialog") as HTMLDialogElement;
+  let back: [Profile | null, string | null] = [null, null];
+  function openCard(p: Profile) {
+    if (mode === "card") {
+      document.documentElement.style.setProperty("--enter", "1");
+      return show(p);
+    }
+    back = [current, shownError];
+    clearTimeout(hintTimer);
+    card.removeAttribute("data-hint"); // no key / swipe hints in the popup
+    cardDialog.append(card);
+    card.hidden = false;
+    cardDialog.showModal();
+    show(p);
+  }
+  cardDialog.addEventListener("close", () => {
+    $("tiles").before(card);
+    card.hidden = mode === "tiles";
+    show(...back); // card mode's card, as it was
+  });
+
+  // ---- tiles: endless scroll, PAGE cards per request ----
+  // Walks one shuffled list of everyone in a loop: after the last person comes the first again.
+  // Each profile is fetched once and kept in memory, so later laps make no requests at all.
+  const PAGE = 12; // divisible by 2 and 3 columns: rows stay whole
+  const MAX_TILES = 120; // DOM cap: rows far above are dropped as you keep scrolling
+  const tileList = $("tile-list");
+  const tilesEnd = $("tiles-end");
+  const sentinel = $("tiles-more");
+  let order: string[] | null = null;
+  let at = 0; // next index into the loop
+  const cache = new Map<string, Profile | null>(); // null = card was deleted
+  let tilesBusy = false;
+  const io = new IntersectionObserver(
+    (es) => es.some((e) => e.isIntersecting) && moreTiles(),
+    { root: $("tiles"), rootMargin: "800px 0px" }, // the tile scroller; start loading well before its bottom
+  );
+
+  async function moreTiles() {
+    if (tilesBusy || mode !== "tiles") return;
+    tilesBusy = true;
+    const start = at;
+    try {
+      order ??= shuffle([...(await allIds())]);
+      let pool = order.filter((id) => id !== myId);
+      if (at + PAGE > pool.length) {
+        // End of the lap is near: add anyone new (refetch at most every 30s) before wrapping to the top.
+        const known = new Set(order);
+        order.push(...shuffle((await allIds(true)).filter((id) => !known.has(id))));
+        pool = order.filter((id) => id !== myId);
+      }
+      if (!pool.length) {
+        tilesEnd.textContent = "ยังไม่มีใครเลย มาเป็นคนแรกกันเถอะ";
+        return;
+      }
+      const batch: string[] = [];
+      while (batch.length < PAGE) {
+        if (at >= pool.length) at = 0;
+        batch.push(pool[at++]);
+      }
+      const missing = [...new Set(batch)].filter((id) => !cache.has(id));
+      if (missing.length) {
+        const got = await fetchProfiles(missing);
+        for (const id of missing) cache.set(id, got.find((p) => p.id === id) ?? null);
+      }
+      tilesEnd.textContent = "";
+      tileList.append(...batch.flatMap((id) => (cache.get(id) ? [tile(cache.get(id)!)] : [])));
+      prune();
+      io.unobserve(sentinel);
+      io.observe(sentinel); // re-check: still near the bottom -> load the next page too
+    } catch (e) {
+      at = start; // try these again
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "ml-2 font-semibold underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-ink";
+      retry.textContent = "ลองใหม่";
+      retry.addEventListener("click", () => {
+        tilesEnd.textContent = "";
+        moreTiles();
+      });
+      tilesEnd.replaceChildren(`โหลดไม่สำเร็จ: ${(e as Error).message}`, retry);
+    } finally {
+      tilesBusy = false;
+      loading.hidden = true;
+    }
+  }
+
+  // Drop whole rows off the top once the list is long. Their height goes into the list's top padding,
+  // so nothing on screen moves and the scroll position is never touched (momentum scrolling stays smooth).
+  let spacer = 0;
+  function prune() {
+    const extra = tileList.childElementCount - MAX_TILES;
+    const cols = getComputedStyle(tileList).gridTemplateColumns.split(" ").length;
+    const n = extra - (extra % cols);
+    if (n <= 0) return;
+    spacer += tileList.children[n].getBoundingClientRect().top - tileList.firstElementChild!.getBoundingClientRect().top;
+    for (let k = 0; k < n; k++) tileList.firstElementChild!.remove();
+    tileList.style.paddingTop = `${spacer}px`;
+  }
+
+  const PERSON = document.querySelector('a[href="/me"] svg')!;
+
+  // Tile = photo, name, description; tap opens the full card (cheers, contacts…) in a popup.
+  // textContent / attributes only: profile text is user input
+  function tile(p: Profile) {
+    const li = document.createElement("li");
+    li.dataset.id = p.id;
+    li.className = "min-w-0";
+    const open = document.createElement("button");
+    open.type = "button";
+    open.setAttribute("aria-label", `ดูการ์ดของ ${p.display_name}`);
+    open.className =
+      "flex size-full min-h-44 flex-col items-start gap-2 rounded-md bg-white p-4 text-left shadow-lg shadow-ink/10 transition-transform active:scale-[0.98] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink";
+    open.addEventListener("click", () => openCard(p));
+    const pic = document.createElement(p.avatar_path ? "img" : "span");
+    pic.className = "grid size-14 shrink-0 place-items-center rounded-full bg-cream object-cover text-ink/30";
+    if (pic instanceof HTMLImageElement) {
+      pic.src = avatarUrl(p.avatar_path!);
+      pic.alt = "";
+      pic.width = pic.height = 56;
+      pic.loading = "lazy";
+      pic.decoding = "async";
+    } else pic.append(PERSON.cloneNode(true)); // no photo: plain person icon (a Thai first letter can be a lone vowel)
+    const name = document.createElement("span");
+    name.className = "w-full truncate font-display text-xl leading-[1.4] font-bold";
+    name.textContent = p.display_name;
+    open.append(pic, name);
+    if (p.description) {
+      const desc = document.createElement("span");
+      desc.className = "line-clamp-3 w-full text-sm/relaxed break-words text-ink/80";
+      desc.textContent = p.description;
+      open.append(desc);
+    }
+    li.append(open);
+    return li;
   }
 
   async function cheers(target: Profile | null = current) {
@@ -1035,6 +1343,7 @@ import FallingIcons from "../components/FallingIcons.astro";
       card.style.translate = card.style.rotate = ""; // snap back
       return;
     }
+    if (cardDialog.open) return cardDialog.close(); // popup card: swipe = close
     fling(Math.sign(dx));
   }
 
@@ -1048,7 +1357,9 @@ import FallingIcons from "../components/FallingIcons.astro";
     card.removeAttribute("data-hint");
     clearTimeout(hintTimer);
     // PC (mouse): A / D / Space keycaps. Touch: a faint finger swiping across the card.
-    hintTimer = setTimeout(() => (card.dataset.hint = pc.matches ? "keys" : "swipe"), pc.matches ? HINT_MS : TOUCH_HINT_MS);
+    hintTimer = setTimeout(() => {
+      if (mode === "card" && !cardDialog.open) card.dataset.hint = pc.matches ? "keys" : "swipe"; // never in tiles / the popup
+    }, pc.matches ? HINT_MS : TOUCH_HINT_MS);
   }
 
   function fling(dir: number, fromKey = false) {
@@ -1065,7 +1376,7 @@ import FallingIcons from "../components/FallingIcons.astro";
   // Keyboard: ← / A swipe left, → / D swipe right. e.code so it also works on a Thai keyboard layout.
   let flinging = false;
   document.addEventListener("keydown", (e) => {
-    if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || flinging) return;
+    if (e.repeat || e.altKey || e.ctrlKey || e.metaKey || flinging || mode === "tiles") return;
     if (document.querySelector("dialog[open]")) return;
     if (
       (e.target as Element).closest(
@@ -1119,5 +1430,5 @@ import FallingIcons from "../components/FallingIcons.astro";
   }
   tick();
 
-  next();
+  setMode(mode);
 </script>

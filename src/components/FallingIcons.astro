@@ -1,6 +1,7 @@
 ---
 // Falling background icons (coffee beans on the home page, trophies on the leaderboard).
-// Positions/timings are fixed at build time (seeded), and the motion is pure CSS (see .bean in global.css),
+// Build-time seeded values are only a fallback: a tiny script re-rolls each icon's column, drift and
+// starting point on every page load. The motion itself is pure CSS (see .bean in global.css),
 // so nothing runs in JS per frame.
 interface Props {
   kind?: 'bean' | 'trophy';
@@ -30,3 +31,15 @@ const items = Array.from({ length: 14 }, () => {
     />
   ))}
 </div>
+
+<script>
+  // New random layout each visit: column, sideways drift, spin, and how far into its fall each icon starts.
+  for (const b of document.querySelectorAll<HTMLElement>('#beans .bean')) {
+    const dur = 9 + Math.random() * 8;
+    b.style.left = `${(Math.random() * 100).toFixed(1)}%`;
+    b.style.setProperty('--dur', `${dur.toFixed(1)}s`);
+    b.style.setProperty('--delay', `-${(Math.random() * dur).toFixed(1)}s`); // negative: already mid-fall
+    b.style.setProperty('--drift', `${Math.round(Math.random() * 80 - 40)}px`);
+    b.style.setProperty('--spin', `${Math.round((180 + Math.random() * 360) * (Math.random() < 0.5 ? -1 : 1))}deg`);
+  }
+</script>
