@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { CONTACTS } from '../lib/contacts';
+import DeviceNote from '../components/DeviceNote.astro';
 ---
 
 <Layout title="การ์ดของฉัน" wide>
@@ -120,6 +121,8 @@ import { CONTACTS } from '../lib/contacts';
       ))}
     </fieldset>
 
+    <!-- No card saved yet: warn where it will live, right above the first save. -->
+    <DeviceNote id="first-note" class="mt-6" hidden />
     <p id="status" role="status" class="mt-6 text-sm font-semibold empty:hidden"></p>
 
     <button id="save" type="submit" disabled
@@ -505,6 +508,7 @@ import { CONTACTS } from '../lib/contacts';
       showSong(toSong(data));
       hasCard = true;
     }
+    document.getElementById('first-note')!.hidden = hasCard;
     save.disabled = false;
   }
 
@@ -565,6 +569,7 @@ import { CONTACTS } from '../lib/contacts';
       document.getElementById('saved-sr')!.textContent = '';
     }, 1600);
     hasCard = true;
+    document.getElementById('first-note')!.hidden = true;
     const old = savedAvatar;
     savedAvatar = avatar_path;
     pendingAvatar = null;

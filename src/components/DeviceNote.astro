@@ -1,0 +1,20 @@
+---
+// The one "no login: your data lives in this browser" warning. Used in the credits popup,
+// the first-cheer nickname popup, and /me until the card is saved the first time.
+interface Props {
+  id?: string;
+  class?: string;
+  hidden?: boolean;
+}
+const { id, class: cls = '', hidden = false } = Astro.props;
+---
+
+<p id={id} hidden={hidden} class:list={['flex items-start gap-2.5 rounded-md bg-cream p-4 text-sm/relaxed', cls]}>
+  <svg viewBox="0 0 24 24" aria-hidden="true" class="mt-0.5 size-5 shrink-0 fill-none stroke-coral" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4.5M12 17h.01" />
+  </svg>
+  <span>
+    ระบบไม่มีล็อคอิน ข้อมูลผู้ใช้งานจะถูกเก็บไว้บนเบราว์เซอร์ปัจจุบัน
+    หากเปลี่ยนเบราว์เซอร์หรือเข้าสู่โหมดไม่ระบุตัวตน ข้อมูลของคุณจะหายไป
+  </span>
+</p>

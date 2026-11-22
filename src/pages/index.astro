@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Countdown from "../components/Countdown.astro";
 import FallingIcons from "../components/FallingIcons.astro";
 import Splash from "../components/Splash.astro";
+import DeviceNote from "../components/DeviceNote.astro";
 
 ---
 
@@ -450,6 +451,8 @@ import Splash from "../components/Splash.astro";
           class="text-sm font-semibold empty:hidden"
         ></p>
       </div>
+      <!-- First cheer = this browser's account is created: say where it lives. -->
+      <DeviceNote />
       <button
         id="nick-save"
         type="submit"
@@ -505,10 +508,7 @@ import Splash from "../components/Splash.astro";
       </li>
     </ul>
     <p class="px-7 pt-4 text-ink/70">จาก มหาวิทยาลัยพระจอมเกล้าพระนครเหนือ</p>
-    <p class="mx-7 mt-6 rounded-md bg-cream p-4 text-sm/relaxed">
-      ระบบไม่มีล็อคอิน ข้อมูลผู้ใช้งานจะถูกเก็บไว้บนเบราว์เซอร์ปัจจุบัน
-      หากเปลี่ยนเบราว์เซอร์หรือเข้าสู่โหมดไม่ระบุตัวตน ข้อมูลของคุณจะหายไป
-    </p>
+    <DeviceNote class="mx-7 mt-6" />
     <p class="px-7 pt-4 pb-7 text-sm">
       หากพบปัญหาสามารถแจ้งได้<a href="https://www.instagram.com/qwrrrrts/" target="_blank" rel="noopener noreferrer"
         class="font-semibold underline decoration-2 underline-offset-4 hover:decoration-coral focus-visible:outline-3 focus-visible:outline-ink">ที่นี่</a>
