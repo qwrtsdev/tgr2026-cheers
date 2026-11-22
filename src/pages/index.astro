@@ -1295,9 +1295,19 @@ import Splash from "../components/Splash.astro";
       pic.loading = "lazy";
       pic.decoding = "async";
     } else pic.append(PERSON.cloneNode(true)); // no photo: plain person icon (a Thai first letter can be a lone vowel)
+    // Name on one line ("…" if long); the DEV badge always stays visible, as on the big card.
     const name = document.createElement("span");
-    name.className = "w-full truncate font-display text-xl leading-[1.4] font-bold";
-    name.textContent = p.display_name;
+    name.className = "flex w-full min-w-0 items-center gap-1.5";
+    const text = document.createElement("span");
+    text.className = "min-w-0 truncate font-display text-xl leading-[1.4] font-bold";
+    text.textContent = p.display_name;
+    name.append(text);
+    if (p.is_dev) {
+      const dev = document.createElement("span");
+      dev.className = "shrink-0 rounded bg-dev px-1.5 py-0.5 font-sans text-xs leading-none font-bold tracking-wide text-white";
+      dev.textContent = "DEV";
+      name.append(dev);
+    }
     open.append(pic, name);
     if (p.description) {
       const desc = document.createElement("span");
