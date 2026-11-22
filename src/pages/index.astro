@@ -246,9 +246,9 @@ import Splash from "../components/Splash.astro";
 
   <!-- Tile view: everyone in a grid, more load as you scroll. -->
   <section id="tiles" hidden aria-label="เพื่อนทุกคน" class="tiles-scroll -mx-4 overflow-y-auto overscroll-contain px-4 py-4">
+    <div id="tiles-space" aria-hidden="true"></div><!-- empty room above, used up as tiles are added on top -->
     <ul id="tile-list" class="grid grid-cols-2 gap-3 md:grid-cols-3"></ul>
     <p id="tiles-end" role="status" class="pt-6 text-center text-ink/70 empty:hidden"></p>
-    <div id="tiles-more" aria-hidden="true" class="h-px"></div>
   </section>
 
   <!-- A tile opened: the same card, in a popup. Swipe it or tap outside to close. -->
@@ -1090,7 +1090,9 @@ import Splash from "../components/Splash.astro";
     const tiles = m === "tiles";
     card.hidden = tiles;
     again.hidden = tiles;
+    if (!tiles) tilesScroll = $("tiles").scrollTop; // some browsers forget it while hidden
     $("tiles").hidden = !tiles;
+    if (tiles) $("tiles").scrollTop = tilesScroll;
     // Tiles: the page becomes one screen tall (top bar / tile scroller / links), and only the tiles scroll.
     // The bars need no background, so the falling beans show behind them while tiles never pass under them.
     const main = document.querySelector("main")!;
@@ -1099,7 +1101,7 @@ import Splash from "../components/Splash.astro";
     modeBtn.querySelector<SVGElement>("[data-icon=tiles]")!.toggleAttribute("hidden", tiles);
     modeBtn.querySelector<SVGElement>("[data-icon=card]")!.toggleAttribute("hidden", !tiles);
     modeBtn.setAttribute("aria-label", tiles ? "เปลี่ยนเป็นแบบปัดการ์ด" : "เปลี่ยนเป็นแบบตาราง");
-    if (tiles) moreTiles();
+    if (tiles) requestAnimationFrame(fillTiles);
     else if (!cardStarted) {
       cardStarted = true;
       next();
@@ -1129,83 +1131,145 @@ import Splash from "../components/Splash.astro";
     show(...back); // card mode's card, as it was
   });
 
-  // ---- tiles: endless scroll, PAGE cards per request ----
-  // Walks one shuffled list of everyone in a loop: after the last person comes the first again.
+  // ---- tiles: endless scroll both ways, PAGE cards per request ----
+  // One shuffled list of everyone, repeated forever in both directions: loop position k shows pool[k mod n].
+  // The DOM holds positions [lo, hi); scrolling down appends, scrolling up prepends, the far end is trimmed.
   // Each profile is fetched once and kept in memory, so later laps make no requests at all.
   const PAGE = 12; // divisible by 2 and 3 columns: rows stay whole
-  const MAX_TILES = 120; // DOM cap: rows far above are dropped as you keep scrolling
+  const MAX_TILES = 120; // DOM cap
+  const ROOM = 200_000; // px of blank space above the tiles; prepended rows take exactly their height from it
+  const scroller = $("tiles");
+  const space = $("tiles-space");
   const tileList = $("tile-list");
   const tilesEnd = $("tiles-end");
-  const sentinel = $("tiles-more");
   let order: string[] | null = null;
-  let at = 0; // next index into the loop
+  let lo = 0;
+  let hi = 0;
+  let room = ROOM;
+  let tilesScroll = 0;
   const cache = new Map<string, Profile | null>(); // null = card was deleted
   let tilesBusy = false;
-  const io = new IntersectionObserver(
-    (es) => es.some((e) => e.isIntersecting) && moreTiles(),
-    { root: $("tiles"), rootMargin: "800px 0px" }, // the tile scroller; start loading well before its bottom
-  );
+  let tilesStopped = false; // failed or nobody to show: wait for "ลองใหม่" instead of retrying in a loop
 
-  async function moreTiles() {
+  // Keep at least AHEAD_PX of tiles past both edges of the view; load a page at a time until that holds.
+  // Checked on every scroll (not only near the ends), so a fast fling or a jump to the top can never
+  // outrun it and leave the view stuck in the blank room.
+  const AHEAD_PX = 800;
+  function fillTiles() {
+    if (tilesBusy || tilesStopped || mode !== "tiles" || scroller.hidden) return;
+    if (lo === hi) return void moreTiles(1);
+    const view = scroller.getBoundingClientRect();
+    const list = tileList.getBoundingClientRect();
+    if (list.top - view.bottom > view.height * 2) {
+      // The view jumped deep into the blank room (iPhone status-bar tap, Home key): bring the tiles back to it
+      // right away instead of loading page after page up to it. Same half-row start as the first page.
+      setRoom(ROOM);
+      scroller.scrollTop = ROOM + (tileList.firstElementChild as HTMLElement).offsetHeight * 0.5;
+      return void requestAnimationFrame(fillTiles);
+    }
+    const above = view.top - list.top;
+    const below = list.bottom - view.bottom;
+    if (Math.min(above, below) < AHEAD_PX) moreTiles(below <= above ? 1 : -1);
+  }
+  scroller.addEventListener("scroll", fillTiles, { passive: true });
+  addEventListener("resize", fillTiles);
+  const setRoom = (px: number) => {
+    room = px;
+    space.style.height = `${px}px`;
+  };
+
+  async function moreTiles(dir: 1 | -1) {
     if (tilesBusy || mode !== "tiles") return;
     tilesBusy = true;
-    const start = at;
     try {
-      order ??= shuffle([...(await allIds())]);
-      let pool = order.filter((id) => id !== myId);
-      if (at + PAGE > pool.length) {
-        // End of the lap is near: add anyone new (refetch at most every 30s) before wrapping to the top.
-        const known = new Set(order);
-        order.push(...shuffle((await allIds(true)).filter((id) => !known.has(id))));
-        pool = order.filter((id) => id !== myId);
-      }
-      if (!pool.length) {
-        tilesEnd.textContent = "ยังไม่มีใครเลย มาเป็นคนแรกกันเถอะ";
-        return;
-      }
-      const batch: string[] = [];
-      while (batch.length < PAGE) {
-        if (at >= pool.length) at = 0;
-        batch.push(pool[at++]);
-      }
-      const missing = [...new Set(batch)].filter((id) => !cache.has(id));
-      if (missing.length) {
-        const got = await fetchProfiles(missing);
-        for (const id of missing) cache.set(id, got.find((p) => p.id === id) ?? null);
+      // Pick up newcomers (the id list is refetched at most every 30s), added to the end of the loop.
+      const ids = await allIds(!!order);
+      order ??= shuffle([...ids]);
+      const known = new Set(order);
+      order.push(...shuffle(ids.filter((id) => !known.has(id))));
+
+      const from = dir > 0 ? hi : lo - PAGE;
+      let batch: string[];
+      for (;;) {
+        const pool = order.filter((id) => id !== myId && cache.get(id) !== null);
+        if (!pool.length) {
+          tilesEnd.textContent = "ยังไม่มีใครเลย มาเป็นคนแรกกันเถอะ";
+          tilesStopped = true;
+          return;
+        }
+        const n = pool.length;
+        batch = Array.from({ length: PAGE }, (_, i) => pool[(((from + i) % n) + n) % n]);
+        const missing = [...new Set(batch)].filter((id) => !cache.has(id));
+        if (missing.length) {
+          const got = await fetchProfiles(missing);
+          for (const id of missing) cache.set(id, got.find((p) => p.id === id) ?? null);
+        }
+        if (batch.every((id) => cache.get(id))) break; // a deleted card turned up: redo the page without it
       }
       tilesEnd.textContent = "";
-      tileList.append(...batch.flatMap((id) => (cache.get(id) ? [tile(cache.get(id)!)] : [])));
-      prune();
-      io.unobserve(sentinel);
-      io.observe(sentinel); // re-check: still near the bottom -> load the next page too
+      const els = batch.map((id) => tile(cache.get(id)!));
+
+      if (lo === hi) {
+        // First page: put it right below the blank room.
+        setRoom(ROOM);
+        tileList.append(...els);
+        // Start mid-way: the top row is cut in half, so it's clear the list scrolls up as well as down.
+        // (Rows above it are prepended right away into the blank room.)
+        scroller.scrollTop = ROOM + (els[0] as HTMLElement).offsetHeight * 0.5;
+        lo = from;
+        hi = from + PAGE;
+      } else if (dir > 0) {
+        tileList.append(...els);
+        hi += PAGE;
+      } else {
+        // Prepend without moving anything on screen: the new rows take their height out of the blank room.
+        const first = tileList.firstElementChild!;
+        const y = first.getBoundingClientRect().top;
+        tileList.prepend(...els);
+        lo -= PAGE;
+        const added = first.getBoundingClientRect().top - y;
+        if (added <= room) setRoom(room - added);
+        else {
+          // ponytail: room used up after ~200k px of scrolling up; fall back to a scroll correction
+          scroller.scrollTop += added - room;
+          setRoom(0);
+        }
+      }
+      trim(dir);
     } catch (e) {
-      at = start; // try these again
+      tilesStopped = true;
       const retry = document.createElement("button");
       retry.type = "button";
       retry.className = "ml-2 font-semibold underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-ink";
       retry.textContent = "ลองใหม่";
       retry.addEventListener("click", () => {
         tilesEnd.textContent = "";
-        moreTiles();
+        tilesStopped = false;
+        fillTiles();
       });
       tilesEnd.replaceChildren(`โหลดไม่สำเร็จ: ${(e as Error).message}`, retry);
     } finally {
       tilesBusy = false;
       loading.hidden = true;
     }
+    requestAnimationFrame(fillTiles); // still short on either side? load the next page there too
   }
 
-  // Drop whole rows off the top once the list is long. Their height goes into the list's top padding,
-  // so nothing on screen moves and the scroll position is never touched (momentum scrolling stays smooth).
-  let spacer = 0;
-  function prune() {
+  // Keep the DOM small: drop whole rows from the end you're moving away from.
+  // Rows dropped at the top give their height back to the blank room, so nothing on screen moves.
+  function trim(dir: 1 | -1) {
     const extra = tileList.childElementCount - MAX_TILES;
     const cols = getComputedStyle(tileList).gridTemplateColumns.split(" ").length;
     const n = extra - (extra % cols);
     if (n <= 0) return;
-    spacer += tileList.children[n].getBoundingClientRect().top - tileList.firstElementChild!.getBoundingClientRect().top;
-    for (let k = 0; k < n; k++) tileList.firstElementChild!.remove();
-    tileList.style.paddingTop = `${spacer}px`;
+    if (dir > 0) {
+      setRoom(room + tileList.children[n].getBoundingClientRect().top - tileList.firstElementChild!.getBoundingClientRect().top);
+      for (let k = 0; k < n; k++) tileList.firstElementChild!.remove();
+      lo += n;
+    } else {
+      for (let k = 0; k < n; k++) tileList.lastElementChild!.remove();
+      hi -= n;
+    }
   }
 
   const PERSON = document.querySelector('a[href="/me"] svg')!;
